@@ -30,7 +30,7 @@ export interface IWebAppOptions {
 
 export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {
   prometheusExporter?: PrometheusExporter;
-  connectorRegistry?: PluginRegistry;
+  connectorRegistry: PluginRegistry;
   logLevel?: LogLevelDesc;
   webAppOptions?: IWebAppOptions;
 }
@@ -65,9 +65,7 @@ export class PluginCcTxVisualization
       options.connectorRegistry,
       `${fnTag} options.connectorRegistry`,
     );
-    if (options.connectorRegistry)
-      this.connectorRegistry = options.connectorRegistry;
-    else this.connectorRegistry = new PluginRegistry();
+    this.connectorRegistry = options.connectorRegistry;
     // this.prometheusExporter.setNodeCount(this.getNodeCount());
   }
 
