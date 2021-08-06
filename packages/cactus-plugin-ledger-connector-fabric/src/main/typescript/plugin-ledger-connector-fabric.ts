@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import fs from "fs";
 import path from "path";
 
@@ -107,6 +108,7 @@ import {
   getTransactionReceiptByTxID,
   IGetTransactionReceiptByTxIDOptions,
 } from "./common/get-transaction-receipt-by-tx-id";
+import {performance} from "perf_hooks";
 /**
  * Constant value holding the default $GOPATH in the Fabric CLI container as
  * observed on fabric deployments that are produced by the official examples
@@ -946,6 +948,10 @@ export class PluginLedgerConnectorFabric
   public async transact(
     req: RunTransactionRequest,
   ): Promise<RunTransactionResponse> {
+    //start transaction time
+    const startTx = performance.now();
+
+    //start tx
     const fnTag = `${this.className}#transact()`;
 
     const {
@@ -1051,6 +1057,12 @@ export class PluginLedgerConnectorFabric
           throw new Error(`${fnTag} unknown ${message}`);
         }
       }
+      //end of Tx
+      const endTx = performance.now();
+      const txTimer = endTx - startTx;
+      this.prometheusExporter.addTimerOfCurrentTransaction(txTimer);
+
+      //logging the transaction
       const outUtf8 = out.toString("utf-8");
       const res: RunTransactionResponse = {
         functionOutput: outUtf8,
@@ -1059,7 +1071,9 @@ export class PluginLedgerConnectorFabric
       };
       gateway.disconnect();
       this.log.debug(`transact() response: %o`, res);
-      this.prometheusExporter.addCurrentTransaction();
+      
+      // wouldn't add this anymore because i can call it in the above method as i need the no of tx before the timer
+      //this.prometheusExporter.addCurrentTransaction();
 
       return res;
     } catch (ex) {
