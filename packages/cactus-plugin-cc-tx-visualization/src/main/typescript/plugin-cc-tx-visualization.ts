@@ -47,7 +47,7 @@ export interface IChannelOptions {
 
 export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {
   prometheusExporter?: PrometheusExporter;
-  connectorRegistry?: PluginRegistry;
+  connectorRegistry: PluginRegistry;
   logLevel?: LogLevelDesc;
   webAppOptions?: IWebAppOptions;
   configApiClients?: APIConfig[];
