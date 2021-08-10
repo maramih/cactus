@@ -13,7 +13,6 @@ export interface IPrometheusExporterOptions {
 
 export class PrometheusExporter {
   public readonly metricsPollingIntervalInMin: number;
-
   public readonly transactions: Transactions = {
     counter: 0,
     totalTime: 0,
