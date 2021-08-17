@@ -1,3 +1,3 @@
-export type NodeCount = {
+export type Transactions = {
   counter: number;
 };

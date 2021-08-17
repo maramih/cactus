@@ -44,9 +44,7 @@ export class PrometheusExporter {
   }
 
   public async getPrometheusMetrics(): Promise<string> {
-    const result = await this.registry.getSingleMetricAsString(
-      K_CACTUS_FABRIC_TOTAL_TX_COUNT,
-    );
+    const result = await promClient.register.metrics();
     return result;
   }
 

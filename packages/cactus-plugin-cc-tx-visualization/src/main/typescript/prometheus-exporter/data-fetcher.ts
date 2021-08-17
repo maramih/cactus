@@ -1,12 +1,9 @@
-import { NodeCount } from "./response.type";
+import { Transactions } from "./response.type";
 
-import {
-  totalTxCount,
-  K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT,
-} from "./metrics";
+import { totalCcTxCount, K_CACTUS_CC_TX_VIZ_TOTAL_TX_COUNT } from "./metrics";
 
-export async function collectMetrics(nodeCount: NodeCount): Promise<void> {
-  totalTxCount
-    .labels(K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT)
+export async function collectMetrics(nodeCount: Transactions): Promise<void> {
+  totalCcTxCount
+    .labels(K_CACTUS_CC_TX_VIZ_TOTAL_TX_COUNT)
     .set(nodeCount.counter);
 }
