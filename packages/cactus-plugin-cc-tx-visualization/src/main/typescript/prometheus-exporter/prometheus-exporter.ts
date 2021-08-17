@@ -1,9 +1,6 @@
 import promClient from "prom-client";
-import { NodeCount } from "./response.type";
-import {
-  totalTxCount,
-  K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT,
-} from "./metrics";
+import { Transactions } from "./response.type";
+import { K_CACTUS_CC_TX_VIZ_TOTAL_TX_COUNT } from "./metrics";
 
 export interface IPrometheusExporterOptions {
   pollingIntervalInMin?: number;
@@ -11,7 +8,7 @@ export interface IPrometheusExporterOptions {
 
 export class PrometheusExporter {
   public readonly metricsPollingIntervalInMin: number;
-  public readonly nodeCount: NodeCount = { counter: 0 };
+  public readonly nodeCount: Transactions = { counter: 0 };
 
   constructor(
     public readonly prometheusExporterOptions: IPrometheusExporterOptions,
@@ -20,16 +17,9 @@ export class PrometheusExporter {
       prometheusExporterOptions.pollingIntervalInMin || 1;
   }
 
-  public setNodeCount(nodeCount: number): void {
-    this.nodeCount.counter = nodeCount;
-    totalTxCount
-      .labels(K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT)
-      .set(this.nodeCount.counter);
-  }
-
   public async getPrometheusMetrics(): Promise<string> {
     const result = await promClient.register.getSingleMetricAsString(
-      K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT,
+      K_CACTUS_CC_TX_VIZ_TOTAL_TX_COUNT,
     );
     return result;
   }
