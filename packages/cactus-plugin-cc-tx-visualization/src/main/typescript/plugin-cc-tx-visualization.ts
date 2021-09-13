@@ -1,16 +1,18 @@
+/* eslint-disable prettier/prettier */
 import { Server } from "http";
 import { Server as SecureServer } from "https";
 import { Optional } from "typescript-optional";
 import { promisify } from "util";
 import express, { Express } from "express";
 import bodyParser from "body-parser";
-
 import {
   IPluginWebService,
   IWebServiceEndpoint,
   ICactusPlugin,
   ICactusPluginOptions,
+  Configuration,
 } from "@hyperledger/cactus-core-api";
+import { BesuApiClient} from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
 
 import { PluginRegistry } from "@hyperledger/cactus-core";
 
@@ -22,10 +24,21 @@ import {
 } from "@hyperledger/cactus-common";
 
 import { PrometheusExporter } from "./prometheus-exporter/prometheus-exporter";
-
+import { DefaultApi as FabricApiClient} from "@hyperledger/cactus-plugin-ledger-connector-fabric/dist/lib/main/typescript/public-api";
+import { MetricModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/metric-model";
 export interface IWebAppOptions {
   port: number;
   hostname: string;
+}
+
+export enum LedgerType {
+  FABRIC,
+  BESU,
+}
+
+export type APIConfig = {
+  type:LedgerType, 
+  basePath: string
 }
 
 export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {
@@ -33,6 +46,7 @@ export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {
   connectorRegistry: PluginRegistry;
   logLevel?: LogLevelDesc;
   webAppOptions?: IWebAppOptions;
+  configApiClients?: APIConfig[];
 }
 
 export class PluginCcTxVisualization
@@ -43,6 +57,9 @@ export class PluginCcTxVisualization
   private endpoints: IWebServiceEndpoint[] | undefined;
   private httpServer: Server | SecureServer | null = null;
   private connectorRegistry: PluginRegistry;
+  private apiClients: any[] = [] ;
+  private configApiClients: APIConfig[];
+  private res: string[] = [];
 
   constructor(public readonly options: IPluginCcTxVisualizationOptions) {
     const fnTag = `PluginCcTxVisualization#constructor()`;
@@ -65,8 +82,29 @@ export class PluginCcTxVisualization
       options.connectorRegistry,
       `${fnTag} options.connectorRegistry`,
     );
-    this.connectorRegistry = options.connectorRegistry;
-    // this.prometheusExporter.setNodeCount(this.getNodeCount());
+    this.connectorRegistry =
+      this.options.connectorRegistry || new PluginRegistry();
+    
+    this.configApiClients = this.options.configApiClients|| [];
+    Checks.truthy(this.configApiClients, `${fnTag} this.configApiClients`);
+
+    if(this.configApiClients.length>0)
+    {
+      this.configApiClients.forEach((config)=>{
+        switch(config.type){
+          case LedgerType.FABRIC:
+            this.apiClients.push(new FabricApiClient(new Configuration({basePath:config.basePath})) );
+            break;
+          case LedgerType.BESU:
+            this.apiClients.push(new BesuApiClient(new Configuration({basePath:config.basePath})) );
+            break;
+          default:
+            break;
+        }
+      });
+    }
+
+     Checks.truthy(this.apiClients, `${fnTag} this.apiClients`);
   }
 
   public getInstanceId(): string {
@@ -86,29 +124,6 @@ export class PluginCcTxVisualization
     this.log.debug(`getPrometheusExporterMetrics() response: %o`, res);
     return res;
   }
-
-  // public getNodeCount(): number {
-  //   const consortiumDatabase: ConsortiumDatabase = this.options
-  //     .consortiumDatabase;
-  //   const consortiumRepo: ConsortiumRepository = new ConsortiumRepository({
-  //     db: consortiumDatabase,
-  //   });
-  //   return consortiumRepo.allNodes.length;
-  // }
-
-  /**
-   * Updates the Node count Prometheus metric of the plugin.
-   * Note: This does not change the underlying consortium database at all,
-   * only affects **the metrics**.
-   */
-  // public updateMetricNodeCount(): void {
-  //   const consortiumDatabase: ConsortiumDatabase = this.options
-  //     .consortiumDatabase;
-  //   const consortiumRepo: ConsortiumRepository = new ConsortiumRepository({
-  //     db: consortiumDatabase,
-  //   });
-  //   this.prometheusExporter.setNodeCount(consortiumRepo.allNodes.length);
-  // }
 
   public async shutdown(): Promise<void> {
     this.log.info(`Shutting down...`);
@@ -161,40 +176,8 @@ export class PluginCcTxVisualization
     if (this.endpoints) {
       return this.endpoints;
     }
-    // log.info(`Creating web services for plugin ${pkgName}...`);
-    // // presence of webAppOptions implies that caller wants the plugin to configure it's own express instance on a custom
-    // // host/port to listen on
-
-    // const { consortiumDatabase, keyPairPem } = this.options;
-    // const consortiumRepo = new ConsortiumRepository({
-    //   db: consortiumDatabase,
-    // });
-
+    
     const endpoints: IWebServiceEndpoint[] = [];
-    // {
-    //   const options = { keyPairPem, consortiumRepo, plugin: this };
-    //   const endpoint = new GetConsortiumEndpointV1(options);
-    //   endpoints.push(endpoint);
-    //   const path = endpoint.getPath();
-    //   this.log.info(`Instantiated GetConsortiumEndpointV1 at ${path}`);
-    // }
-    // {
-    //   const options = { keyPairPem, consortiumRepo, plugin: this };
-    //   const endpoint = new GetNodeJwsEndpoint(options);
-    //   const path = endpoint.getPath();
-    //   endpoints.push(endpoint);
-    //   this.log.info(`Instantiated GetNodeJwsEndpoint at ${path}`);
-    // }
-    // {
-    //   const opts: IGetPrometheusExporterMetricsEndpointV1Options = {
-    //     plugin: this,
-    //     logLevel: this.options.logLevel,
-    //   };
-    //   const endpoint = new GetPrometheusExporterMetricsEndpointV1(opts);
-    //   const path = endpoint.getPath();
-    //   endpoints.push(endpoint);
-    //   this.log.info(`Instantiated GetNodeJwsEndpoint at ${path}`);
-    // }
     this.endpoints = endpoints;
 
     log.info(`Instantiated web svcs for plugin ${pkgName} OK`, { endpoints });
@@ -207,5 +190,15 @@ export class PluginCcTxVisualization
 
   public getPackageName(): string {
     return `@hyperledger/cactus-plugin-cc-tx-visualization`;
+  }
+
+  public async getAllPrometheusMetrics():Promise<MetricModel[]>{
+    const results: MetricModel[]=[];
+    for (let index =0; index<this.apiClients.length;index++){
+      const res = await this.apiClients[index].getPrometheusMetricsV1();
+      results.push(...res.data);
+    }
+
+    return results;
   }
 }

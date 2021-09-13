@@ -1,7 +1,6 @@
 /* eslint-disable prettier/prettier */
 import fs from "fs";
 import path from "path";
-
 import { Certificate } from "@fidm/x509";
 import { Express } from "express";
 import "multer";
@@ -12,6 +11,7 @@ import {
   SSHExecCommandOptions,
   SSHExecCommandResponse,
 } from "node-ssh";
+import {MetricModel} from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/metric-model";
 import {
   DefaultEventHandlerOptions,
   DefaultEventHandlerStrategies,
@@ -161,6 +161,9 @@ export class PluginLedgerConnectorFabric
   private endpoints: IWebServiceEndpoint[] | undefined;
   private readonly secureIdentity: SecureIdentityProviders;
   private readonly certStore: CertDatastore;
+  //TODO: add array of tx, define a tx model: method values timestamp
+  //check the req type
+  //private transactions: Array<>();
 
   public get className(): string {
     return PluginLedgerConnectorFabric.CLASS_NAME;
@@ -220,10 +223,18 @@ export class PluginLedgerConnectorFabric
     return this.prometheusExporter;
   }
 
-  public async getPrometheusExporterMetrics(): Promise<string> {
-    const res: string = await this.prometheusExporter.getPrometheusMetrics();
-    this.log.debug(`getPrometheusExporterMetrics() response: %o`, res);
-    return res;
+  public async getPrometheusExporterMetrics(): Promise<MetricModel[]> {
+    const res = await this.prometheusExporter.getPrometheusMetrics();
+    //TODO: check the amount of metrics gathered
+    const results:MetricModel[] = [];
+    for (let index = 0; index < 2; index++) {
+      console.log(res[index].name);
+      results.push(new MetricModel(res[index]));
+      console.log(results[0].name);
+    }
+
+   // this.log.debug(`getPrometheusExporterMetrics() response: %o`, results.values.toString());
+    return results;
   }
 
   public getInstanceId(): string {
@@ -1071,10 +1082,6 @@ export class PluginLedgerConnectorFabric
       };
       gateway.disconnect();
       this.log.debug(`transact() response: %o`, res);
-      
-      // wouldn't add this anymore because i can call it in the above method as i need the no of tx before the timer
-      //this.prometheusExporter.addCurrentTransaction();
-
       return res;
     } catch (ex) {
       this.log.error(`transact() crashed: `, ex);
