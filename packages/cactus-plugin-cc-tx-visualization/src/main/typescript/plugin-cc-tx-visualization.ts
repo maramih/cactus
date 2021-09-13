@@ -12,6 +12,7 @@ import {
   ICactusPluginOptions,
   LedgerType,
 } from "@hyperledger/cactus-core-api";
+import { BesuApiClient} from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
 
 import { PluginRegistry } from "@hyperledger/cactus-core";
 
@@ -43,6 +44,16 @@ export interface IChannelOptions {
   queueId: string,
   dltTechnology: LedgerType | null,
   persistMessages: boolean
+}
+
+export enum LedgerType {
+  FABRIC,
+  BESU,
+}
+
+export type APIConfig = {
+  type:LedgerType, 
+  basePath: string
 }
 
 export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {

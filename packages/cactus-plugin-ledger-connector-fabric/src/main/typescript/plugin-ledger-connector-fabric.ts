@@ -172,6 +172,9 @@ export class PluginLedgerConnectorFabric
   private endpoints: IWebServiceEndpoint[] | undefined;
   private readonly secureIdentity: SecureIdentityProviders;
   private readonly certStore: CertDatastore;
+  //TODO: add array of tx, define a tx model: method values timestamp
+  //check the req type
+  //private transactions: Array<>();
 
 
   private amqpConnection: amqp.Connection | undefined;
