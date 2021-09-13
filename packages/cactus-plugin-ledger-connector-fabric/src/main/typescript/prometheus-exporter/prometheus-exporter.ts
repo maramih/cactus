@@ -43,13 +43,14 @@ export class PrometheusExporter {
     txLatency.labels(K_CACTUS_FABRIC_TX_LATENCY).set(this.transactions.avgTime);
   }
 
-  public async getPrometheusMetrics(): Promise<string> {
-    const result = await promClient.register.metrics();
+  public async getPrometheusMetrics(): Promise<promClient.metric[]> {
+    const result = await this.registry.getMetricsAsJSON();
     return result;
   }
 
   public startMetricsCollection(): void {
     this.registry.registerMetric(totalTxCount);
+    this.registry.registerMetric(txLatency);
     promClient.collectDefaultMetrics({ register: this.registry });
   }
 }

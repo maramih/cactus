@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
 import { PluginRegistry } from "@hyperledger/cactus-core";
+import { Server as SocketIoServer } from "socket.io";
+import { Constants, PluginImportType } from "@hyperledger/cactus-core-api";
 import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import {
+  APIConfig,
   IPluginCcTxVisualizationOptions,
+  LedgerType,
   PluginCcTxVisualization,
 } from "../../../main/typescript/plugin-cc-tx-visualization";
 import { Configuration, ICactusPlugin } from "@hyperledger/cactus-core-api";
@@ -15,6 +19,7 @@ import { DiscoveryOptions } from "fabric-network";
 import { LogLevelDesc } from "loglevel";
 import { AddressInfo } from "net";
 import {
+  BesuTestLedger,
   Containers,
   FabricTestLedgerV1,
   pruneDockerAllIfGithubAction,
@@ -22,7 +27,7 @@ import {
 import { PluginKeychainMemory } from "@hyperledger/cactus-plugin-keychain-memory";
 import {
   PluginLedgerConnectorFabric,
-  DefaultApi as FabricApi,
+  DefaultApi,
   DefaultEventHandlerStrategy,
   FabricSigningCredential,
   IPluginLedgerConnectorFabricOptions,
@@ -31,60 +36,71 @@ import {
 } from "@hyperledger/cactus-plugin-ledger-connector-fabric";
 import http from "http";
 import { K_CACTUS_FABRIC_TOTAL_TX_COUNT } from "@hyperledger/cactus-plugin-ledger-connector-fabric/src/main/typescript/prometheus-exporter/metrics";
+import {
+  EthContractInvocationType,
+  Web3SigningCredentialType,
+  PluginLedgerConnectorBesu,
+  PluginFactoryLedgerConnector,
+  Web3SigningCredentialCactusKeychainRef,
+  ReceiptType,
+  BesuApiClient,
+  WatchBlocksV1Progress,
+  Web3BlockHeader,
+  BesuApiClientOptions,
+} from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
+import Web3 from "web3";
+import HelloWorldContractJson from "@hyperledger/cactus-plugin-ledger-connector-besu/src/test/solidity/hello-world-contract/HelloWorld.json";
+
+// test("Basic Instantiation", (t: Test) => {
+//   const options: IPluginCcTxVisualizationOptions = {
+//     instanceId: uuidv4(),
+//     connectorRegistry: new PluginRegistry(),
+//   };
+
+//   const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualization(
+//     options,
+//   );
+
+//   t.ok(pluginCcTxVisualization, "Instantiated");
+//   t.end();
+// });
+
+// test("Dummy Connector Instantiaton", (t: Test) => {
+//     class DummyPlugin implements ICactusPlugin{
+//     private readonly instanceId: string;
+
+//     constructor(){
+//       this.instanceId = "CCTX_DUMMY_" + uuidv4();
+//     }
+//     public getInstanceId(): string {
+//       return this.instanceId;
+//     }
+//     public getPackageName(): string {
+//       return "DummyPlugin";
+//     }
+//     public async onPluginInit(): Promise<unknown> {
+//       return;
+//     }
+
+//   }
 
 
+//   //add connector reference to the registry
+//   const connectorRegistryTest = new PluginRegistry();
+//   connectorRegistryTest.add(new DummyPlugin());
 
+//   const options: IPluginCcTxVisualizationOptions = {
+//     instanceId: uuidv4(),
+//     connectorRegistry: connectorRegistryTest,
+//   };
 
-test("Basic Instantiation", (t: Test) => {
-  const options: IPluginCcTxVisualizationOptions = {
-    instanceId: uuidv4(),
-    connectorRegistry: new PluginRegistry(),
-  };
+//   const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualization(
+//     options,
+//   );
 
-  const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualization(
-    options,
-  );
-
-  t.ok(pluginCcTxVisualization, "Instantiated");
-  t.end();
-});
-
-test("Dummy Connector Instantiaton", (t: Test) => {
-    class DummyPlugin implements ICactusPlugin{
-    private readonly instanceId: string;
-
-    constructor(){
-      this.instanceId = "CCTX_DUMMY_" + uuidv4();
-    }
-    public getInstanceId(): string {
-      return this.instanceId;
-    }
-    public getPackageName(): string {
-      return "DummyPlugin";
-    }
-    public async onPluginInit(): Promise<unknown> {
-      return;
-    }
-
-  }
-
-
-  //add connector reference to the registry
-  const connectorRegistryTest = new PluginRegistry();
-  connectorRegistryTest.add(new DummyPlugin());
-
-  const options: IPluginCcTxVisualizationOptions = {
-    instanceId: uuidv4(),
-    connectorRegistry: connectorRegistryTest,
-  };
-
-  const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualization(
-    options,
-  );
-
-  t.ok(pluginCcTxVisualization, "Instantiated with a dummy connector");
-  t.end();
-});
+//   t.ok(pluginCcTxVisualization, "Instantiated with a dummy connector");
+//   t.end();
+// });
 
 const logLevel: LogLevelDesc = "TRACE";
 test("BEFORE " , async (t: Test) => {
@@ -101,7 +117,7 @@ const logLevel: LogLevelDesc = "TRACE";
     await Containers.logDiagnostics({ logLevel });
   });
 
-  const ledger = new FabricTestLedgerV1({
+  const FabricTestLedger = new FabricTestLedgerV1({
     emitContainerLogs: true,
     publishAllPorts: true,
     logLevel,
@@ -112,51 +128,51 @@ const logLevel: LogLevelDesc = "TRACE";
       ["CA_VERSION", "1.4.9"],
     ]),
   });
-  t.ok(ledger, "ledger (FabricTestLedgerV1) truthy OK");
+  t.ok(FabricTestLedger, "ledger (FabricTestLedgerV1) truthy OK");
 
   const tearDownLedger = async () => {
-    await ledger.stop();
-    await ledger.destroy();
+    await FabricTestLedger.stop();
+    await FabricTestLedger.destroy();
     await pruneDockerAllIfGithubAction({ logLevel });
   };
 
   test.onFinish(tearDownLedger);
 
-  await ledger.start();
+  await FabricTestLedger.start();
 
-  const enrollAdminOut = await ledger.enrollAdmin();
+  const enrollAdminOut = await FabricTestLedger.enrollAdmin();
   const adminWallet = enrollAdminOut[1];
-  const [userIdentity] = await ledger.enrollUser(adminWallet);
+  const [userIdentity] = await FabricTestLedger.enrollUser(adminWallet);
 
-  const connectionProfile = await ledger.getConnectionProfileOrg1();
+  const connectionProfile = await FabricTestLedger.getConnectionProfileOrg1();
 
-  const sshConfig = await ledger.getSshConfig();
+  const sshConfig = await FabricTestLedger.getSshConfig();
 
-  const keychainInstanceId = uuidv4();
-  const keychainId = uuidv4();
-  const keychainEntryKey = "user2";
-  const keychainEntryValue = JSON.stringify(userIdentity);
+  const keychainInstanceIdFabric = uuidv4();
+  const keychainIdFabric = uuidv4();
+  const keychainEntryKeyFabric = "user2";
+  const keychainEntryValueFabric = JSON.stringify(userIdentity);
 
-  const keychainPlugin = new PluginKeychainMemory({
-    instanceId: keychainInstanceId,
-    keychainId,
+  const keychainPluginFabric = new PluginKeychainMemory({
+    instanceId: keychainInstanceIdFabric,
+    keychainId: keychainIdFabric,
     logLevel,
     backend: new Map([
-      [keychainEntryKey, keychainEntryValue],
+      [keychainEntryKeyFabric, keychainEntryValueFabric],
       ["some-other-entry-key", "some-other-entry-value"],
     ]),
   });
 
-  const pluginRegistry = new PluginRegistry({ plugins: [keychainPlugin] });
+  const FabricPluginRegistry = new PluginRegistry({ plugins: [keychainPluginFabric] });
 
   const discoveryOptions: DiscoveryOptions = {
     enabled: true,
     asLocalhost: true,
   };
 
-  const pluginOptions: IPluginLedgerConnectorFabricOptions = {
+  const FabricPluginOptions: IPluginLedgerConnectorFabricOptions = {
     instanceId: uuidv4(),
-    pluginRegistry,
+    pluginRegistry: FabricPluginRegistry,
     sshConfig,
     cliContainerEnv: {},
     peerBinary: "/fabric-samples/bin/peer",
@@ -168,100 +184,194 @@ const logLevel: LogLevelDesc = "TRACE";
       commitTimeout: 300,
     },
   };
-  const fabricConnector = new PluginLedgerConnectorFabric(pluginOptions);
+  const FabricConnector = new PluginLedgerConnectorFabric(FabricPluginOptions);
 
-  const expressApp = express();
-  expressApp.use(bodyParser.json({ limit: "250mb" }));
-  const server = http.createServer(expressApp);
-  const listenOptions: IListenOptions = {
+  const expressAppFabric = express();
+  expressAppFabric.use(bodyParser.json({ limit: "250mb" }));
+  const serverFabric = http.createServer(expressAppFabric);
+  const listenOptionsFabric: IListenOptions = {
     hostname: "localhost",
     port: 0,
-    server,
+    server: serverFabric,
   };
-  const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-  test.onFinish(async () => await Servers.shutdown(server));
-  const { address, port } = addressInfo;
-  const apiHost = `http://${address}:${port}`;
+  const addressInfoFabric = (await Servers.listen(listenOptionsFabric)) as AddressInfo;
+  test.onFinish(async () => await Servers.shutdown(serverFabric));
+  const { address, port } = addressInfoFabric;
+  const apiHostFabric = `http://${address}:${port}`;
   t.comment(
-    `Metrics URL: ${apiHost}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-fabric/get-prometheus-exporter-metrics`,
+    `Metrics URL: ${apiHostFabric}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-fabric/get-prometheus-exporter-metrics`,
   );
 
-  const apiConfig = new Configuration({ basePath: apiHost });
-  const apiClient = new FabricApi(apiConfig);
+  const FabricApiConfig = new Configuration({ basePath: apiHostFabric });
 
-  await fabricConnector.getOrCreateWebServices();
-  await fabricConnector.registerWebServices(expressApp);
 
-  // const assetId = "asset277";
-  // const assetOwner = uuidv4();
+  await FabricConnector.getOrCreateWebServices();
+  await FabricConnector.registerWebServices(expressAppFabric);
+
 
   const channelName = "mychannel";
   const contractName = "basic";
   const signingCredential: FabricSigningCredential = {
-    keychainId,
-    keychainRef: keychainEntryKey,
+    keychainId: keychainIdFabric,
+    keychainRef: keychainEntryKeyFabric,
   };
-  {
-    const res = await apiClient.runTransactionV1({
-      signingCredential,
-      channelName,
-      contractName,
-      invocationType: FabricContractInvocationType.Call,
-      methodName: "GetAllAssets",
-      params: [],
-    } as RunTransactionRequest);
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.doesNotThrow(() => JSON.parse(res.data.functionOutput));
-  }
-
-  {
-    const res = await apiClient.getPrometheusMetricsV1();
-    const promMetricsOutput =
-      "# HELP " +
-      K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-      " Total transactions executed\n" +
-      "# TYPE " +
-      K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-      " gauge\n" +
-      K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-      '{type="' +
-      K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-      '"} 1';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Transaction Count of 3 recorded as expected. RESULT OK",
-    );
-  }
-
-
-
-
-
+  
+ 
 //BESU
+const besuTestLedger = new BesuTestLedger();
+await besuTestLedger.start();
 
+test.onFinish(async () => {
+  await besuTestLedger.stop();
+  await besuTestLedger.destroy();
+  await pruneDockerAllIfGithubAction({ logLevel });
+});
 
+const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
+const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
 
+const firstHighNetWorthAccount = besuTestLedger.getGenesisAccountPubKey();
+const besuKeyPair = {
+  privateKey: besuTestLedger.getGenesisAccountPrivKey(),
+};
+
+const web3 = new Web3(rpcApiHttpHost);
+const testEthAccount = web3.eth.accounts.create(uuidv4());
+
+const keychainEntryKeyBesu = uuidv4();
+const keychainEntryValueBesu = testEthAccount.privateKey;
+const keychainPluginBesu = new PluginKeychainMemory({
+  instanceId: uuidv4(),
+  keychainId: uuidv4(),
+  // pre-provision keychain with mock backend holding the private key of the
+  // test account that we'll reference while sending requests with the
+  // signing credential pointing to this keychain entry.
+  backend: new Map([[keychainEntryKeyBesu, keychainEntryValueBesu]]),
+  logLevel,
+});
+keychainPluginBesu.set(
+  HelloWorldContractJson.contractName,
+  JSON.stringify(HelloWorldContractJson),
+);
+const factory = new PluginFactoryLedgerConnector({
+  pluginImportType: PluginImportType.Local,
+});
+
+const BesuConnector: PluginLedgerConnectorBesu = await factory.create({
+  rpcApiHttpHost,
+  rpcApiWsHost,
+  logLevel,
+  instanceId: uuidv4(),
+  pluginRegistry: new PluginRegistry({ plugins: [keychainPluginBesu] }),
+});
+
+const expressAppBesu = express();
+expressAppBesu.use(bodyParser.json({ limit: "250mb" }));
+const serverBesu = http.createServer(expressAppBesu);
+
+const wsApi = new SocketIoServer(serverFabric, {
+  path: Constants.SocketIoConnectionPathV1,
+});
+
+const listenOptionsBesu: IListenOptions = {
+  hostname: "localhost",
+  port: 0,
+  server: serverBesu,
+};
+const addressInfoBesu = (await Servers.listen(listenOptionsBesu)) as AddressInfo;
+test.onFinish(async () => await Servers.shutdown(serverBesu));
+const addressBesu:string = addressInfoBesu.address;
+const portBesu:number = addressInfoBesu.port;
+const apiHostBesu = `http://${addressBesu}:${portBesu}`;
+t.comment(
+  `Metrics URL: ${apiHostBesu}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-besu/get-prometheus-exporter-metrics`,
+);
+
+const wsBasePath = apiHostFabric + Constants.SocketIoConnectionPathV1;
+t.comment("WS base path: " + wsBasePath);
+const besuApiClientOptions = new BesuApiClientOptions({ basePath: apiHostBesu });
+await BesuConnector.getOrCreateWebServices();
+await BesuConnector.registerWebServices(expressAppBesu, wsApi);
+
+// // apis' config
+const testApiConfig: APIConfig[] = [];
+testApiConfig.push({type: LedgerType.FABRIC, basePath:apiHostFabric});
+testApiConfig.push({type: LedgerType.BESU, basePath:apiHostBesu});
 
 
 
 //add connector reference to the registry
 const connectorRegistryTest = new PluginRegistry();
-connectorRegistryTest.add(fabricConnector);
-//connectorRegistryTest.add();
+connectorRegistryTest.add(FabricConnector);
+connectorRegistryTest.add(BesuConnector);
+
+//apiClients
+const besuApiClient = new BesuApiClient(besuApiClientOptions);
+const fabricApiClient = new DefaultApi(FabricApiConfig);
+
+ //add apiClients
+ const apiClientsTest: any[] = [];
+ apiClientsTest.push(fabricApiClient);
+ apiClientsTest.push(besuApiClient);
+
 
 const options: IPluginCcTxVisualizationOptions = {
   instanceId: uuidv4(),
   connectorRegistry: connectorRegistryTest,
+  //apiClients: apiClientsTest,
+  configApiClients: testApiConfig,
 };
 
 const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualization(
   options,
 );
+
+
+
+{
+  const res = await fabricApiClient.runTransactionV1({
+    signingCredential,
+    channelName,
+    contractName,
+    invocationType: FabricContractInvocationType.Call,
+    methodName: "GetAllAssets",
+    params: [],
+  } as RunTransactionRequest);
+  t.ok(res);
+  t.ok(res.data);
+  t.equal(res.status, 200);
+  t.doesNotThrow(() => JSON.parse(res.data.functionOutput));
+}
+{
+  const metrics = await pluginCcTxVisualization.getAllPrometheusMetrics();
+  t.ok(metrics);
+  //console.log(metrics[0].name + " " + metrics[0].value );
+  // t.true(
+  //       metrics.includes("#HELP"),
+  //       "RESULT OK on all metrics",
+  //     );
+}
+// {
+//   const res = await fabricApiClient.getPrometheusMetricsV1();
+//   const promMetricsOutput =
+//     "# HELP " +
+//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
+//     " Total transactions executed\n" +
+//     "# TYPE " +
+//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
+//     " gauge\n" +
+//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
+//     '{type="' +
+//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
+//     '"} 1';
+//   t.ok(res);
+//   t.ok(res.data);
+//   t.equal(res.status, 200);
+//   t.true(
+//     res.data.includes(promMetricsOutput),
+//     "Total Transaction Count of 3 recorded as expected. RESULT OK",
+//   );
+// }
 
 t.ok(pluginCcTxVisualization, "Instantiated with Fabric and Besu");
 t.end();
