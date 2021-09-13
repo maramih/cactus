@@ -26,10 +26,20 @@ import {
 import { PrometheusExporter } from "./prometheus-exporter/prometheus-exporter";
 import { DefaultApi as FabricApiClient} from "@hyperledger/cactus-plugin-ledger-connector-fabric/dist/lib/main/typescript/public-api";
 import { MetricModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/metric-model";
+import { CrossChainEventLog } from "./models/metric-model";
+
+export interface isVisualizable {
+  // list of transaction receipts, that will be sent to cctxviz  
+  transactionReceipts: any[];
+  collectTransactionReceipts: boolean;
+}
+
 export interface IWebAppOptions {
   port: number;
   hostname: string;
 }
+
+
 
 export enum LedgerType {
   FABRIC,
@@ -47,6 +57,7 @@ export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {
   logLevel?: LogLevelDesc;
   webAppOptions?: IWebAppOptions;
   configApiClients?: APIConfig[];
+  crossChainLogName: string;
 }
 
 export class PluginCcTxVisualization
@@ -60,6 +71,8 @@ export class PluginCcTxVisualization
   private apiClients: any[] = [] ;
   private configApiClients: APIConfig[];
   private res: string[] = [];
+  // TODO in the future logs (or a serialization of logs) could be given as an option
+  private crossChainLogs: CrossChainEventLog[] = [];
 
   constructor(public readonly options: IPluginCcTxVisualizationOptions) {
     const fnTag = `PluginCcTxVisualization#constructor()`;
@@ -99,10 +112,11 @@ export class PluginCcTxVisualization
             this.apiClients.push(new BesuApiClient(new Configuration({basePath:config.basePath})) );
             break;
           default:
-            break;
+            throw new Error("Unsupported ledger type");
         }
       });
     }
+    this.crossChainLogs.push(new CrossChainEventLog({name: options.crossChainLogName}));
 
      Checks.truthy(this.apiClients, `${fnTag} this.apiClients`);
   }
@@ -120,6 +134,12 @@ export class PluginCcTxVisualization
   }
 
   public async getPrometheusExporterMetrics(): Promise<string> {
+    const res: string = await this.prometheusExporter.getPrometheusMetrics();
+    this.log.debug(`getPrometheusExporterMetrics() response: %o`, res);
+    return res;
+  }
+
+  public async getTransactionReceipts(): Promise<string> {
     const res: string = await this.prometheusExporter.getPrometheusMetrics();
     this.log.debug(`getPrometheusExporterMetrics() response: %o`, res);
     return res;
@@ -201,4 +221,20 @@ export class PluginCcTxVisualization
 
     return results;
   }
+
+  //  1st phase:
+  // Gather raw data
+
+
+
+  // 2nd phase 
+  // convert data into CrossChainEventLogEntry
+
+  // 3 phase 
+  // run process mining over Log and create model
+
+  // 4 phase 
+  // serialize the model and send it to the frontend
+
+  
 }

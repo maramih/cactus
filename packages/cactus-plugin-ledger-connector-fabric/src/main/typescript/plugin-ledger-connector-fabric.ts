@@ -108,6 +108,7 @@ import {
   IIdentityData,
 } from "./identity/internal/cert-datastore";
 import {performance} from "perf_hooks";
+import { receiveMessageOnPort } from "worker_threads";
 /**
  * Constant value holding the default $GOPATH in the Fabric CLI container as
  * observed on fabric deployments that are produced by the official examples
@@ -139,6 +140,7 @@ export interface IPluginLedgerConnectorFabricOptions
   vaultConfig?: IVaultConfig;
 }
 
+// TODO implemnets isVisualizable
 export class PluginLedgerConnectorFabric
   implements
     IPluginLedgerConnector<
@@ -160,6 +162,9 @@ export class PluginLedgerConnectorFabric
   private endpoints: IWebServiceEndpoint[] | undefined;
   private readonly secureIdentity: SecureIdentityProviders;
   private readonly certStore: CertDatastore;
+  private collectTransactionReceipts: boolean = false;
+  // TODO check
+  // private transactionReceiptList: FabricTransactionReceipt;
   //TODO: add array of tx, define a tx model: method values timestamp
   //check the req type
   //private transactions: Array<>();
@@ -222,6 +227,11 @@ export class PluginLedgerConnectorFabric
     return this.prometheusExporter;
   }
 
+  //TODO returns Promise<FabricTransactionRreceupt>
+  public async getTransactionReceiptList(): Promise<void>  {
+    //returns list
+  }
+  
   public async getPrometheusExporterMetrics(): Promise<MetricModel[]> {
     const res = await this.prometheusExporter.getPrometheusMetrics();
     //TODO: check the amount of metrics gathered
@@ -1051,7 +1061,7 @@ export class PluginLedgerConnectorFabric
               transactionProposal.setEndorsingOrganizations(org);
             });
           }
-
+          
           out = await transactionProposal.setTransient(transientMap).submit();
           success = true;
           break;
