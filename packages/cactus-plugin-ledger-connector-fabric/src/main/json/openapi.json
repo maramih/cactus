@@ -922,6 +922,43 @@
             "PrometheusExporterMetricsResponse": {
                 "type": "string",
                 "nullable": false
+            },
+            "GetTransactionReceiptResponse": {
+                "type": "object",
+                "properties": {
+                   "blockNumber":{
+                       "type":"string"
+                   },
+                   "channelID":{
+                       "type": "string"
+                   },
+                   "transactionCreator":{},
+                   "transactionEndorsement":{
+                       "type":"array",
+                       "items":{}
+                   },
+                   "chainCodeName":{
+                       "type":"string"
+                   },
+                   "chainCodeVersion":{
+                       "type":"string"
+                   },
+                   "responseStatus":{
+                       "type":"string"
+                   },
+                   "rwsetKey":{
+                   },
+                   "rwsetWriteData":{
+                       "type": "string"
+                   },
+                   "blockMeteData":{}
+                }
+            },
+            "TransactionReceiptsListResponse":{
+              "type": "array",
+              "items":{
+                "$ref": "#/components/schemas/GetTransactionReceiptResponse"
+              }
             }
         }
     },
@@ -1132,6 +1169,32 @@
                     }
                 }
             }
+        },
+         "/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-fabric/get-transaction-receipts-list": {
+            "get": {
+                "x-hyperledger-cactus": {
+                    "http": {
+                        "verbLowerCase": "get",
+                        "path": "/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-fabric/get-transaction-receipts-list"
+                    }
+                },
+                "operationId": "getTransactionReceiptsListV1",
+                "summary": "Gets the list of transaction receipts",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TransactionReceiptsListResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
+        
     }
 }

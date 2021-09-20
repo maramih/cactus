@@ -109,6 +109,8 @@ import {
   IGetTransactionReceiptByTxIDOptions,
 } from "./common/get-transaction-receipt-by-tx-id";
 import {performance} from "perf_hooks";
+import {IsVisualizable} from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/plugin-cc-tx-visualization";
+
 /**
  * Constant value holding the default $GOPATH in the Fabric CLI container as
  * observed on fabric deployments that are produced by the official examples
@@ -138,6 +140,7 @@ export interface IPluginLedgerConnectorFabricOptions
   eventHandlerOptions?: GatewayEventHandlerOptions;
   supportedIdentity?: FabricSigningCredentialType[];
   vaultConfig?: IVaultConfig;
+  collectTransactionReceipts?: boolean;
 }
 
 export class PluginLedgerConnectorFabric
@@ -149,7 +152,8 @@ export class PluginLedgerConnectorFabric
       RunTransactionResponse
     >,
     ICactusPlugin,
-    IPluginWebService {
+    IPluginWebService, 
+    IsVisualizable {
   public static readonly CLASS_NAME = "PluginLedgerConnectorFabric";
   private readonly instanceId: string;
   private readonly log: Logger;
@@ -161,9 +165,11 @@ export class PluginLedgerConnectorFabric
   private endpoints: IWebServiceEndpoint[] | undefined;
   private readonly secureIdentity: SecureIdentityProviders;
   private readonly certStore: CertDatastore;
+  public collectTransactionReceipts: boolean;
+  //TODO change type "any" after merging 
+  public transactionReceipts: any[] =[];
   //TODO: add array of tx, define a tx model: method values timestamp
-  //check the req type
-  //private transactions: Array<>();
+
 
   public get className(): string {
     return PluginLedgerConnectorFabric.CLASS_NAME;
@@ -209,6 +215,7 @@ export class PluginLedgerConnectorFabric
       vaultConfig: opts.vaultConfig,
     });
     this.certStore = new CertDatastore(opts.pluginRegistry);
+    this.collectTransactionReceipts = opts.collectTransactionReceipts || false;
   }
 
   public getOpenApiSpec(): unknown {
@@ -230,11 +237,35 @@ export class PluginLedgerConnectorFabric
     for (let index = 0; index < 2; index++) {
       console.log(res[index].name);
       results.push(new MetricModel(res[index]));
-      console.log(results[0].name);
     }
 
    // this.log.debug(`getPrometheusExporterMetrics() response: %o`, results.values.toString());
     return results;
+  }
+
+  //TODO merging with Jason's code to get each transaction receipt
+  //
+
+  // public async getTransactionReceiptByTxID(
+  //   req: RunTransactionRequest,
+  // ): Promise<GetTransactionReceiptResponse> {
+  //   const gateway = await this.createGateway(req);
+  //   const options: IGetTransactionReceiptByTxIDOptions = {
+  //     channelName: req.channelName,
+  //     params: req.params,
+  //     gateway: gateway,
+  //   };
+  //   return await getTransactionReceiptForLockContractByTxID(options);
+  // }
+
+
+  public async getTransactionReceiptByTxID(): Promise<void> {
+    //returns GetTransactionReceiptResponse
+  }
+
+  //TODO returns Promise<FabricTransactionReceipt>
+  public async getTransactionReceiptsList(): Promise<void>  {
+    //returns list
   }
 
   public getInstanceId(): string {
@@ -1073,7 +1104,11 @@ export class PluginLedgerConnectorFabric
       const txTimer = endTx - startTx;
       this.prometheusExporter.addTimerOfCurrentTransaction(txTimer);
 
-      //logging the transaction
+      //TODO  
+      if (true === this.collectTransactionReceipts){
+        //this.transactionReceipts.push(this.getTransactionReceiptByTxID(req));
+      }
+
       const outUtf8 = out.toString("utf-8");
       const res: RunTransactionResponse = {
         functionOutput: outUtf8,
