@@ -24,11 +24,18 @@ import {
 } from "@hyperledger/cactus-common";
 
 import { PrometheusExporter } from "./prometheus-exporter/prometheus-exporter";
-import { DefaultApi as FabricApiClient} from "@hyperledger/cactus-plugin-ledger-connector-fabric/dist/lib/main/typescript/public-api";
+import { DefaultApi as FabricApiClient} from "@hyperledger/cactus-plugin-ledger-connector-fabric/src/main/typescript/generated/openapi/typescript-axios/api";
 import { MetricModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/metric-model";
+import { CrossChainEventLog } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/crosscahin-event-log";
 export interface IWebAppOptions {
   port: number;
   hostname: string;
+}
+
+export interface IsVisualizable {
+  // list of transaction receipts, that will be sent to cc-tx-viz  
+  transactionReceipts: any[];
+  collectTransactionReceipts: boolean;
 }
 
 export enum LedgerType {
@@ -59,7 +66,8 @@ export class PluginCcTxVisualization
   private connectorRegistry: PluginRegistry;
   private apiClients: any[] = [] ;
   private configApiClients: APIConfig[];
-  private res: string[] = [];
+  // TODO in the future logs (or a serialization of logs) could be given as an option
+  private crossChainLogs: CrossChainEventLog[] = [];
 
   constructor(public readonly options: IPluginCcTxVisualizationOptions) {
     const fnTag = `PluginCcTxVisualization#constructor()`;
@@ -99,12 +107,15 @@ export class PluginCcTxVisualization
             this.apiClients.push(new BesuApiClient(new Configuration({basePath:config.basePath})) );
             break;
           default:
-            break;
+            throw new Error("Unsupported ledger type");
         }
       });
     }
 
      Checks.truthy(this.apiClients, `${fnTag} this.apiClients`);
+  }
+  getOpenApiSpec(): unknown {
+    throw new Error("Method not implemented.");
   }
 
   public getInstanceId(): string {
@@ -201,4 +212,19 @@ export class PluginCcTxVisualization
 
     return results;
   }
+
+  //  1st phase:
+  // Gather raw data
+
+
+
+  // 2nd phase 
+  // convert data into CrossChainEventLogEntry
+
+  // 3 phase 
+  // run process mining over Log and create model
+
+  // 4 phase 
+  // serialize the model and send it to the frontend
+  
 }

@@ -84,7 +84,6 @@ import HelloWorldContractJson from "@hyperledger/cactus-plugin-ledger-connector-
 
 //   }
 
-
 //   //add connector reference to the registry
 //   const connectorRegistryTest = new PluginRegistry();
 //   connectorRegistryTest.add(new DummyPlugin());
@@ -204,10 +203,8 @@ const logLevel: LogLevelDesc = "TRACE";
 
   const FabricApiConfig = new Configuration({ basePath: apiHostFabric });
 
-
   await FabricConnector.getOrCreateWebServices();
   await FabricConnector.registerWebServices(expressAppFabric);
-
 
   const channelName = "mychannel";
   const contractName = "basic";
@@ -215,8 +212,7 @@ const logLevel: LogLevelDesc = "TRACE";
     keychainId: keychainIdFabric,
     keychainRef: keychainEntryKeyFabric,
   };
-  
- 
+
 //BESU
 const besuTestLedger = new BesuTestLedger();
 await besuTestLedger.start();
@@ -298,8 +294,6 @@ const testApiConfig: APIConfig[] = [];
 testApiConfig.push({type: LedgerType.FABRIC, basePath:apiHostFabric});
 testApiConfig.push({type: LedgerType.BESU, basePath:apiHostBesu});
 
-
-
 //add connector reference to the registry
 const connectorRegistryTest = new PluginRegistry();
 connectorRegistryTest.add(FabricConnector);
@@ -314,7 +308,6 @@ const fabricApiClient = new DefaultApi(FabricApiConfig);
  apiClientsTest.push(fabricApiClient);
  apiClientsTest.push(besuApiClient);
 
-
 const options: IPluginCcTxVisualizationOptions = {
   instanceId: uuidv4(),
   connectorRegistry: connectorRegistryTest,
@@ -325,8 +318,6 @@ const options: IPluginCcTxVisualizationOptions = {
 const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualization(
   options,
 );
-
-
 
 {
   const res = await fabricApiClient.runTransactionV1({
