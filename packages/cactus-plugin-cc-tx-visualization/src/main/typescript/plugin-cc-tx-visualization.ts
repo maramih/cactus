@@ -10,9 +10,8 @@ import {
   IWebServiceEndpoint,
   ICactusPlugin,
   ICactusPluginOptions,
-  LedgerType,
 } from "@hyperledger/cactus-core-api";
-import { BesuApiClient} from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
+//import { BesuApiClient} from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
 
 import { PluginRegistry } from "@hyperledger/cactus-core";
 
@@ -34,12 +33,6 @@ export interface IWebAppOptions {
 import * as Amqp from "amqp-ts";
 import { CrossChainModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/crosschain-model";
 
-
-export type APIConfig = {
-  type:LedgerType, 
-  basePath: string
-}
-
 export interface IChannelOptions {
   queueId: string,
   dltTechnology: LedgerType | null,
@@ -58,7 +51,7 @@ export type APIConfig = {
 
 export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {
   prometheusExporter?: PrometheusExporter;
-  connectorRegistry: PluginRegistry;
+  connectorRegistry?: PluginRegistry;
   logLevel?: LogLevelDesc;
   webAppOptions?: IWebAppOptions;
   configApiClients?: APIConfig[];
