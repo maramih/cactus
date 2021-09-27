@@ -109,7 +109,10 @@ import {
   IGetTransactionReceiptByTxIDOptions,
 } from "./common/get-transaction-receipt-by-tx-id";
 import {performance} from "perf_hooks";
-import {IsVisualizable} from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/plugin-cc-tx-visualization";
+import * as amqp from "amqp-ts";
+import ccTxViz from "@hyperledger/cactus-plugin-cc-tx-visualization";
+//import {IsVisualizable} from "@hyperledger/cactus-plugin-cc-tx-visualization";
+//import { randomUUID } from "crypto";
 
 /**
  * Constant value holding the default $GOPATH in the Fabric CLI container as
@@ -141,6 +144,10 @@ export interface IPluginLedgerConnectorFabricOptions
   supportedIdentity?: FabricSigningCredentialType[];
   vaultConfig?: IVaultConfig;
   collectTransactionReceipts?: boolean;
+  isVisualizable?: boolean;
+  persistMessages?: boolean;
+  queueId?: string;
+  eventProvider?: string;
 }
 
 export class PluginLedgerConnectorFabric
@@ -151,9 +158,9 @@ export class PluginLedgerConnectorFabric
       RunTransactionRequest,
       RunTransactionResponse
     >,
+    ccTxViz.IsVisualizable,
     ICactusPlugin,
-    IPluginWebService, 
-    IsVisualizable {
+    IPluginWebService {
   public static readonly CLASS_NAME = "PluginLedgerConnectorFabric";
   private readonly instanceId: string;
   private readonly log: Logger;
@@ -165,11 +172,15 @@ export class PluginLedgerConnectorFabric
   private endpoints: IWebServiceEndpoint[] | undefined;
   private readonly secureIdentity: SecureIdentityProviders;
   private readonly certStore: CertDatastore;
-  public collectTransactionReceipts: boolean;
-  //TODO change type "any" after merging 
-  public transactionReceipts: any[] =[];
-  //TODO: add array of tx, define a tx model: method values timestamp
 
+
+  private amqpConnection: amqp.Connection | undefined;
+  private amqpQueue: amqp.Queue | undefined;
+  private amqpExchange: amqp.Exchange | undefined;
+  public readonly isVisualizable: boolean;
+  public readonly persistMessages: boolean | undefined;
+  public readonly queueId: string | undefined;
+  public readonly eventProvider: string | undefined;
 
   public get className(): string {
     return PluginLedgerConnectorFabric.CLASS_NAME;
@@ -178,7 +189,7 @@ export class PluginLedgerConnectorFabric
   constructor(public readonly opts: IPluginLedgerConnectorFabricOptions) {
     const fnTag = `${this.className}#constructor()`;
     Checks.truthy(opts, `${fnTag} arg options`);
-    Checks.truthy(opts.instanceId, `${fnTag} options.instanceId`);
+    //Checks.truthy(opts.instanceId, `${fnTag} options.instanceId`);
     Checks.truthy(opts.peerBinary, `${fnTag} options.peerBinary`);
     Checks.truthy(opts.pluginRegistry, `${fnTag} options.pluginRegistry`);
     Checks.truthy(opts.connectionProfile, `${fnTag} options.connectionProfile`);
@@ -215,7 +226,21 @@ export class PluginLedgerConnectorFabric
       vaultConfig: opts.vaultConfig,
     });
     this.certStore = new CertDatastore(opts.pluginRegistry);
-    this.collectTransactionReceipts = opts.collectTransactionReceipts || false;
+
+    // Visualization part
+    this.isVisualizable = opts.isVisualizable || false;
+    if (this.isVisualizable)  {
+      this.eventProvider = opts.eventProvider || "amqp://localhost";
+      this.log.debug("Initializing connection to RabbitMQ");
+      this.amqpConnection = new amqp.Connection(this.eventProvider);
+      this.log.info("Connection to RabbitMQ server initialized");
+      const queue = this.opts.queueId || "cc-tx-viz-exchange";
+      this.queueId = queue;
+      this.persistMessages = this.opts.persistMessages || false;
+      this.amqpExchange = this.amqpConnection.declareExchange(`cc-tx-viz-exchange`, "direct", {durable: this.persistMessages});
+      this.amqpQueue = this.amqpConnection.declareQueue(this.queueId, {durable: this.persistMessages});
+      this.amqpQueue.bind(this.amqpExchange);
+    }
   }
 
   public getOpenApiSpec(): unknown {
@@ -1104,9 +1129,13 @@ export class PluginLedgerConnectorFabric
       const txTimer = endTx - startTx;
       this.prometheusExporter.addTimerOfCurrentTransaction(txTimer);
 
-      //TODO  
-      if (true === this.collectTransactionReceipts){
-        //this.transactionReceipts.push(this.getTransactionReceiptByTxID(req));
+      if (this.isVisualizable)  {
+        //TODO get receipt
+        //TODO what does the receipt have? Map to fabric v2 receipt model in the CC-Viz plugin
+        //TODO equiv for Besu
+        const txReceipt = new amqp.Message("receipt");
+        this.amqpQueue?.send(txReceipt);
+        this.log.debug(`Sent transaction receipt to queue ${this.queueId}`);
       }
 
       const outUtf8 = out.toString("utf-8");
