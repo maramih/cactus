@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable prettier/prettier */
+/*
 import { PluginRegistry } from "@hyperledger/cactus-core";
 import { Server as SocketIoServer } from "socket.io";
-import { Constants, PluginImportType } from "@hyperledger/cactus-core-api";
+import { Constants, LedgerType, PluginImportType } from "@hyperledger/cactus-core-api";
 import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import {
   APIConfig,
   IPluginCcTxVisualizationOptions,
-  LedgerType,
-  PluginCcTxVisualization,
+  CcTxVisualization,
 } from "../../../main/typescript/plugin-cc-tx-visualization";
 import { Configuration, ICactusPlugin } from "@hyperledger/cactus-core-api";
 import { IListenOptions, Servers } from "@hyperledger/cactus-common";
@@ -291,8 +290,8 @@ await BesuConnector.registerWebServices(expressAppBesu, wsApi);
 
 // // apis' config
 const testApiConfig: APIConfig[] = [];
-testApiConfig.push({type: LedgerType.FABRIC, basePath:apiHostFabric});
-testApiConfig.push({type: LedgerType.BESU, basePath:apiHostBesu});
+testApiConfig.push({type: LedgerType.Fabric2, basePath:apiHostFabric});
+testApiConfig.push({type: LedgerType.Besu2X, basePath:apiHostBesu});
 
 //add connector reference to the registry
 const connectorRegistryTest = new PluginRegistry();
@@ -308,16 +307,9 @@ const fabricApiClient = new DefaultApi(FabricApiConfig);
  apiClientsTest.push(fabricApiClient);
  apiClientsTest.push(besuApiClient);
 
-const options: IPluginCcTxVisualizationOptions = {
-  instanceId: uuidv4(),
-  connectorRegistry: connectorRegistryTest,
-  //apiClients: apiClientsTest,
-  configApiClients: testApiConfig,
-};
+ // TODO instantiate cctxviz
+ 
 
-const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualization(
-  options,
-);
 
 {
   const res = await fabricApiClient.runTransactionV1({
@@ -333,37 +325,8 @@ const pluginCcTxVisualization: PluginCcTxVisualization = new PluginCcTxVisualiza
   t.equal(res.status, 200);
   t.doesNotThrow(() => JSON.parse(res.data.functionOutput));
 }
-{
-  const metrics = await pluginCcTxVisualization.getAllPrometheusMetrics();
-  t.ok(metrics);
-  //console.log(metrics[0].name + " " + metrics[0].value );
-  // t.true(
-  //       metrics.includes("#HELP"),
-  //       "RESULT OK on all metrics",
-  //     );
-}
-// {
-//   const res = await fabricApiClient.getPrometheusMetricsV1();
-//   const promMetricsOutput =
-//     "# HELP " +
-//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-//     " Total transactions executed\n" +
-//     "# TYPE " +
-//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-//     " gauge\n" +
-//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-//     '{type="' +
-//     K_CACTUS_FABRIC_TOTAL_TX_COUNT +
-//     '"} 1';
-//   t.ok(res);
-//   t.ok(res.data);
-//   t.equal(res.status, 200);
-//   t.true(
-//     res.data.includes(promMetricsOutput),
-//     "Total Transaction Count of 3 recorded as expected. RESULT OK",
-//   );
-// }
 
-t.ok(pluginCcTxVisualization, "Instantiated with Fabric and Besu");
 t.end();
+
 });
+*/

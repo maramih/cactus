@@ -10,9 +10,8 @@ import {
   IWebServiceEndpoint,
   ICactusPlugin,
   ICactusPluginOptions,
-  Configuration,
+  LedgerType,
 } from "@hyperledger/cactus-core-api";
-import { BesuApiClient} from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
 
 import { PluginRegistry } from "@hyperledger/cactus-core";
 
@@ -24,98 +23,103 @@ import {
 } from "@hyperledger/cactus-common";
 
 import { PrometheusExporter } from "./prometheus-exporter/prometheus-exporter";
-import { DefaultApi as FabricApiClient} from "@hyperledger/cactus-plugin-ledger-connector-fabric/src/main/typescript/generated/openapi/typescript-axios/api";
 import { MetricModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/metric-model";
-import { CrossChainEventLog } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/crosscahin-event-log";
+import { CrossChainEvent, CrossChainEventLog } from "./models/cross-chain-event";
+
 export interface IWebAppOptions {
   port: number;
   hostname: string;
 }
+import * as Amqp from "amqp-ts";
+import { CrossChainModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/crosschain-model";
 
-export interface IsVisualizable {
-  // list of transaction receipts, that will be sent to cc-tx-viz  
-  transactionReceipts: any[];
-  collectTransactionReceipts: boolean;
-}
-
-export enum LedgerType {
-  FABRIC,
-  BESU,
-}
 
 export type APIConfig = {
   type:LedgerType, 
   basePath: string
 }
 
+export interface IChannelOptions {
+  queueId: string,
+  dltTechnology: LedgerType | null,
+  persistMessages: boolean
+}
+
 export interface IPluginCcTxVisualizationOptions extends ICactusPluginOptions {
   prometheusExporter?: PrometheusExporter;
-  connectorRegistry: PluginRegistry;
+  connectorRegistry?: PluginRegistry;
   logLevel?: LogLevelDesc;
   webAppOptions?: IWebAppOptions;
   configApiClients?: APIConfig[];
+  eventProvider: string;
+  channelOptions: IChannelOptions;
+  instanceId: string;
 }
 
-export class PluginCcTxVisualization
+// TODO - for extensability, modularity, and flexibility,
+// this plugin could have a list of connections and list of queues
+
+export class CcTxVisualization
   implements ICactusPlugin, IPluginWebService {
+  [x: string]: any;
   public prometheusExporter: PrometheusExporter;
   private readonly log: Logger;
   private readonly instanceId: string;
   private endpoints: IWebServiceEndpoint[] | undefined;
   private httpServer: Server | SecureServer | null = null;
-  private connectorRegistry: PluginRegistry;
   private apiClients: any[] = [] ;
-  private configApiClients: APIConfig[];
   // TODO in the future logs (or a serialization of logs) could be given as an option
   private crossChainLogs: CrossChainEventLog[] = [];
-
+    private readonly eventProvider: string;
+    private amqpConnection: Amqp.Connection;
+    private amqpQueue: Amqp.Queue;
+    private amqpExchange: Amqp.Exchange;
+    public readonly className = "plugin-cc-tx-visualization";
+    private readonly queueId: string;
+    private txReceipts: any[];
+    private readonly persistMessages: boolean;
   constructor(public readonly options: IPluginCcTxVisualizationOptions) {
     const fnTag = `PluginCcTxVisualization#constructor()`;
     if (!options) {
       throw new Error(`${fnTag} options falsy.`);
     }
+    //TODO check other mandatory options
     Checks.truthy(options.instanceId, `${fnTag} options.instanceId`);
+    const level = this.options.logLevel || "INFO";
+    const label = this.className;
+    this.queueId = options.channelOptions.queueId || "cc-tx-viz-queue";
     this.log = LoggerProvider.getOrCreate({
-      label: "plugin-cc-tx-visualization",
+      label:  label,
+      level: level,
     });
-    this.instanceId = this.options.instanceId;
     this.prometheusExporter =
       options.prometheusExporter ||
-      new PrometheusExporter({ pollingIntervalInMin: 1 });
-    Checks.truthy(
-      this.prometheusExporter,
-      `${fnTag} options.prometheusExporter`,
-    );
-    Checks.truthy(
-      options.connectorRegistry,
-      `${fnTag} options.connectorRegistry`,
-    );
-    this.connectorRegistry =
-      this.options.connectorRegistry || new PluginRegistry();
-    
-    this.configApiClients = this.options.configApiClients|| [];
-    Checks.truthy(this.configApiClients, `${fnTag} this.configApiClients`);
-
-    if(this.configApiClients.length>0)
-    {
-      this.configApiClients.forEach((config)=>{
-        switch(config.type){
-          case LedgerType.FABRIC:
-            this.apiClients.push(new FabricApiClient(new Configuration({basePath:config.basePath})) );
-            break;
-          case LedgerType.BESU:
-            this.apiClients.push(new BesuApiClient(new Configuration({basePath:config.basePath})) );
-            break;
-          default:
-            throw new Error("Unsupported ledger type");
-        }
-      });
-    }
-
-     Checks.truthy(this.apiClients, `${fnTag} this.apiClients`);
-  }
+    new PrometheusExporter({ pollingIntervalInMin: 1 });
+    this.instanceId = this.options.instanceId;
+    this.txReceipts = [];
+    this.persistMessages = options.channelOptions.persistMessages || false;
+    this.eventProvider = options.eventProvider;
+    this.log.debug("Initializing connection to RabbitMQ");
+    this.amqpConnection = new Amqp.Connection(this.eventProvider);
+    this.log.info("Connection to RabbitMQ server initialized");
+    this.amqpExchange = this.amqpConnection.declareExchange(`cc-tx-viz-exchange`, "direct", {durable: this.persistMessages});
+    this.amqpQueue = this.amqpConnection.declareQueue(this.queueId, {durable: this.persistMessages});
+    this.amqpQueue.bind(this.amqpExchange);
+  
+  } 
   getOpenApiSpec(): unknown {
     throw new Error("Method not implemented.");
+  }
+
+
+
+  get messages(): any[] {
+    return this.txReceipts;
+  }
+
+  public closeConnection(): Promise<void>  {
+    this.log.info("Closing Amqp connection");
+    return this.amqpConnection.close();
   }
 
   public getInstanceId(): string {
@@ -213,18 +217,71 @@ export class PluginCcTxVisualization
     return results;
   }
 
-  //  1st phase:
-  // Gather raw data
 
+  // Receives raw transaction receipts from RabbitMQ
+  public pollTxReceipts(): Promise<void>  {
+    const fnTag = `${this.className}#pollTxReceipts()`;
+    this.log.debug(fnTag);
+    return this.amqpQueue.activateConsumer( (message) => {
+      const messageContent = message.getContent();
+      this.log.debug(`Received message from ${this.queueId}: ${messageContent}`);
+      this.txReceipts.push(messageContent);
+      message.ack();
+    }, { noAck: false });
+  }
 
+  // convert data into CrossChainEven
+  // returns a list of CrossChainEvent
+  public async txReceiptToCrossChainEventLogEntry(): Promise<CrossChainEvent|void> {
+    const fnTag = `${this.className}#pollTxReceipts()`;
+    this.log.debug(fnTag);
+    try {
+      
+      this.txReceipts.forEach(receipt => {
+        switch(receipt) {
+          // TODO case receipt.type === Fabric2X
+          // type should be a ledger type as defined in cactus core
+          default:
+            this.log.info("Tx Receipt is not supported");
+        }
+        
+      });
+      // Clear receipt array
+      this.txReceipts = [];
+    return;
+    } catch (error) {
+      this.log.error(error);
+    }
 
-  // 2nd phase 
-  // convert data into CrossChainEventLogEntry
+  }
 
-  // 3 phase 
-  // run process mining over Log and create model
+  // takes CrossChainEvent list and feeds a crosschain event log
+  public async updateCrossChainLog(): Promise<CrossChainEventLog|void>  {
+    return;
+  }
 
-  // 4 phase 
-  // serialize the model and send it to the frontend
+  // Calculates e2e latency, e2e throughput, e2e cost
+  public async processCrossChainEventLog(): Promise<void> {
+    return;
+    //Pause the connection for all the channels
+    //creates log
+    //clears arrays
+    //resumes connections
+  }
+
+  public async createCrossChainModel(): Promise<CrossChainModel|void>  {
+    return;
+  }
   
+  // TODO endpoint calling this function
+  public async getCrossChainModel(): Promise<CrossChainModel|void> {
+    return;
+  }
+
+  // TODO endpoints for e2e latency, e2e throughput, e2e cost
+
+
+  public async getE2ELatencyAverage(): Promise<number|void> {
+    return;
+  }
 }

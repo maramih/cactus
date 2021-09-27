@@ -4,17 +4,17 @@ import {
 } from "@hyperledger/cactus-core-api";
 import {
   IPluginCcTxVisualizationOptions,
-  PluginCcTxVisualization,
+  CcTxVisualization,
 } from "./plugin-cc-tx-visualization";
 
 export class PluginFactoryWebService extends PluginFactory<
-  PluginCcTxVisualization,
+  CcTxVisualization,
   IPluginCcTxVisualizationOptions,
   IPluginFactoryOptions
 > {
   async create(
     pluginOptions: IPluginCcTxVisualizationOptions,
-  ): Promise<PluginCcTxVisualization> {
-    return new PluginCcTxVisualization(pluginOptions);
+  ): Promise<CcTxVisualization> {
+    return new CcTxVisualization(pluginOptions);
   }
 }

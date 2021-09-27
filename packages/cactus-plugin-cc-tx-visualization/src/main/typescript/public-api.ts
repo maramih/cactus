@@ -1,9 +1,10 @@
 export {
-  PluginCcTxVisualization,
+  CcTxVisualization,
   IPluginCcTxVisualizationOptions,
   IWebAppOptions,
 } from "./plugin-cc-tx-visualization";
 
+export { IsVisualizable } from "./models/transaction-receipt";
 export * from "./generated/openapi/typescript-axios/index";
 
 export { PluginFactoryWebService } from "./plugin-factory-cc-tx-visualization";

@@ -1,4 +1,4 @@
-type CrossChainEvent = {
+export type CrossChainEvent = {
   caseID: string;
   timestamp: Date;
   blockchainID: string;
@@ -6,7 +6,7 @@ type CrossChainEvent = {
   parameters: string[];
 };
 
-interface ICrossChainEventLog {
+export interface ICrossChainEventLog {
   name: string;
 }
 
@@ -22,10 +22,7 @@ export class CrossChainEventLog {
     this.logName = options.name;
   }
 
-  // todo getter creation date, last update data
-  public getCreationDate(): Date {
-    return this.creationDate;
-  }
+  // todo getter creation date, pause
 
   public getLastUpdateDate(): Date {
     return this.lastUpdateDate;
