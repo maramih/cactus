@@ -144,3 +144,4 @@ export { isRunningInGithubAction } from "./github-actions/is-running-in-github-a
 export { pruneDockerAllIfGithubAction } from "./github-actions/prune-docker-all-if-github-action";
 export { IDockerPullProgress } from "./common/i-docker-pull-progress";
 export { IDockerPullProgressDetail } from "./common/i-docker-pull-progress";
+export { RabbitMQTestServer } from "./rabbitmq-test-server/rabbit-mq-test-server";
