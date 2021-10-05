@@ -1,8 +1,13 @@
+//import { randomUUID } from "crypto";
+//import { BesuV2TxReceipt } from "./transaction-receipt";
+//import { v4 as uuidv4 } from "uuid";
+
 export type CrossChainEvent = {
   caseID: string;
   timestamp: Date;
   blockchainID: string;
-  activity: string;
+  invocationType: string;
+  methodName: string;
   parameters: string[];
 };
 
@@ -15,6 +20,7 @@ export class CrossChainEventLog {
   private creationDate: Date;
   private lastUpdateDate: Date;
   public readonly logName: string;
+  //TODO: add a pause boolean?
 
   constructor(options: ICrossChainEventLog) {
     this.creationDate = new Date();
@@ -22,7 +28,9 @@ export class CrossChainEventLog {
     this.logName = options.name;
   }
 
-  // todo getter creation date, pause
+  public getCreationDate(): Date {
+    return this.creationDate;
+  }
 
   public getLastUpdateDate(): Date {
     return this.lastUpdateDate;

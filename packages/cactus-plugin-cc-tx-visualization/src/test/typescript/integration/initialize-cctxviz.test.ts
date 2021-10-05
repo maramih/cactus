@@ -23,6 +23,7 @@ test("BEFORE " + testCase, async (t: Test) => {
 });
 
 test(testCase, async (t: Test) => {
+  //initialize rabbitmq
   const options = {
     publishAllPorts: true,
     port: 5672,

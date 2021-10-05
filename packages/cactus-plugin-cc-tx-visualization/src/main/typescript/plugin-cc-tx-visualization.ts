@@ -10,6 +10,7 @@ import {
   IWebServiceEndpoint,
   ICactusPlugin,
   ICactusPluginOptions,
+  LedgerType,
 } from "@hyperledger/cactus-core-api";
 //import { BesuApiClient} from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
 
@@ -32,6 +33,7 @@ export interface IWebAppOptions {
 }
 import * as Amqp from "amqp-ts";
 import { CrossChainModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/crosschain-model";
+import { BesuV2TxReceipt } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/transaction-receipt";
 
 export interface IChannelOptions {
   queueId: string,
@@ -39,10 +41,10 @@ export interface IChannelOptions {
   persistMessages: boolean
 }
 
-export enum LedgerType {
-  FABRIC,
-  BESU,
-}
+// export enum LedgerType {
+//   FABRIC,
+//   BESU,
+// }
 
 export type APIConfig = {
   type:LedgerType, 
@@ -73,7 +75,7 @@ export class CcTxVisualization
   private httpServer: Server | SecureServer | null = null;
   private apiClients: any[] = [] ;
   // TODO in the future logs (or a serialization of logs) could be given as an option
-  private crossChainLogs: CrossChainEventLog[] = [];
+  private crossChainLogs: CrossChainEventLog;
     private readonly eventProvider: string;
     private amqpConnection: Amqp.Connection;
     private amqpQueue: Amqp.Queue;
@@ -100,6 +102,7 @@ export class CcTxVisualization
       options.prometheusExporter ||
     new PrometheusExporter({ pollingIntervalInMin: 1 });
     this.instanceId = this.options.instanceId;
+    this.crossChainLogs = new CrossChainEventLog({name:"CC-TX-VIZ_EVENT_LOGS"});
     this.txReceipts = [];
     this.persistMessages = options.channelOptions.persistMessages || false;
     this.eventProvider = options.eventProvider;
@@ -227,24 +230,38 @@ export class CcTxVisualization
     const fnTag = `${this.className}#pollTxReceipts()`;
     this.log.debug(fnTag);
     return this.amqpQueue.activateConsumer( (message) => {
+      //const messageContent = message.content.toString();
       const messageContent = message.getContent();
-      this.log.debug(`Received message from ${this.queueId}: ${messageContent}`);
+     // this.log.debug(`Received message from ${this.queueId}: ${messageContent}`);
+      this.log.debug(`Received message from ${this.queueId}: ${message.content.toString()}`);
       this.txReceipts.push(messageContent);
       message.ack();
     }, { noAck: false });
   }
 
-  // convert data into CrossChainEven
+  // convert data into CrossChainEvent
   // returns a list of CrossChainEvent
-  public async txReceiptToCrossChainEventLogEntry(): Promise<CrossChainEvent|void> {
+  public async txReceiptToCrossChainEventLogEntry(): Promise<CrossChainEvent[]|void> {
     const fnTag = `${this.className}#pollTxReceipts()`;
     this.log.debug(fnTag);
-    try {
-      
+    try {    
       this.txReceipts.forEach(receipt => {
-        switch(receipt) {
-          // TODO case receipt.type === Fabric2X
-          // type should be a ledger type as defined in cactus core
+        switch(receipt.blockchainID) {
+          case LedgerType.Besu2X:
+            const besuReceipt: BesuV2TxReceipt = receipt;
+            const ccEventFromBesu:CrossChainEvent = {
+              caseID: besuReceipt.caseID,
+              blockchainID:besuReceipt.blockchainID,
+              invocationType: besuReceipt.invocationType,
+              methodName:besuReceipt.methodName,
+              parameters:besuReceipt.parameters,
+              timestamp: besuReceipt.timestamp,
+            };
+            this.crossChainLogs.addCrossChainEvent(ccEventFromBesu);
+            this.log.info("Added Cross Chain event from BESU");
+            break;
+          case LedgerType.Fabric2:
+            this.log.info("Tx Receipt is not supported yet");
           default:
             this.log.info("Tx Receipt is not supported");
         }
@@ -258,6 +275,7 @@ export class CcTxVisualization
     }
 
   }
+
 
   // takes CrossChainEvent list and feeds a crosschain event log
   public async updateCrossChainLog(): Promise<CrossChainEventLog|void>  {
@@ -283,8 +301,6 @@ export class CcTxVisualization
   }
 
   // TODO endpoints for e2e latency, e2e throughput, e2e cost
-
-
   public async getE2ELatencyAverage(): Promise<number|void> {
     return;
   }

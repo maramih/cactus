@@ -18,6 +18,7 @@ import { TransactionReceipt } from "web3-eth";
 import {
   GetBalanceV1Request,
   GetBalanceV1Response,
+  //Web3TransactionReceipt,
 } from "./generated/openapi/typescript-axios/index";
 
 import {
@@ -31,6 +32,7 @@ import {
   IPluginWebService,
   ICactusPlugin,
   ICactusPluginOptions,
+  LedgerType,
 } from "@hyperledger/cactus-core-api";
 
 import {
@@ -93,6 +95,11 @@ import { RunTransactionEndpoint } from "./web-services/run-transaction-endpoint"
 import { GetBlockEndpoint } from "./web-services/get-block-v1-endpoint-";
 import { GetBesuRecordEndpointV1 } from "./web-services/get-besu-record-endpoint-v1";
 import { MetricModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/metric-model";
+import * as amqp from "amqp-ts";
+import {
+  BesuV2TxReceipt,
+  IsVisualizable,
+} from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/transaction-receipt";
 
 export const E_KEYCHAIN_NOT_FOUND = "cactus.connector.besu.keychain_not_found";
 
@@ -103,6 +110,10 @@ export interface IPluginLedgerConnectorBesuOptions
   pluginRegistry: PluginRegistry;
   prometheusExporter?: PrometheusExporter;
   logLevel?: LogLevelDesc;
+  collectTransactionReceipts?: boolean;
+  persistMessages?: boolean;
+  queueId?: string;
+  eventProvider?: string;
 }
 
 export class PluginLedgerConnectorBesu
@@ -114,7 +125,9 @@ export class PluginLedgerConnectorBesu
       RunTransactionResponse
     >,
     ICactusPlugin,
-    IPluginWebService {
+    IPluginWebService,
+    IsVisualizable {
+  public static readonly CLASS_NAME = "PluginLedgerConnectorBesu";
   private readonly instanceId: string;
   public prometheusExporter: PrometheusExporter;
   private readonly log: Logger;
@@ -125,11 +138,18 @@ export class PluginLedgerConnectorBesu
   private contracts: {
     [name: string]: Contract;
   } = {};
-
   private endpoints: IWebServiceEndpoint[] | undefined;
   private httpServer: Server | SecureServer | null = null;
 
-  public static readonly CLASS_NAME = "PluginLedgerConnectorBesu";
+  public transactionReceipts: any[] = [];
+  public collectTransactionReceipts: boolean;
+
+  private amqpConnection: amqp.Connection | undefined;
+  private amqpQueue: amqp.Queue | undefined;
+  private amqpExchange: amqp.Exchange | undefined;
+  public readonly persistMessages: boolean | undefined;
+  public readonly queueId: string | undefined;
+  public readonly eventProvider: string | undefined;
 
   public get className(): string {
     return PluginLedgerConnectorBesu.CLASS_NAME;
@@ -160,8 +180,29 @@ export class PluginLedgerConnectorBesu
       this.prometheusExporter,
       `${fnTag} options.prometheusExporter`,
     );
-
     this.prometheusExporter.startMetricsCollection();
+
+    //Visualization part
+    this.collectTransactionReceipts =
+      options.collectTransactionReceipts || false;
+    if (this.collectTransactionReceipts) {
+      this.eventProvider = options.eventProvider || "amqp://localhost";
+      this.log.debug("Initializing connection to RabbitMQ");
+      this.amqpConnection = new amqp.Connection(this.eventProvider);
+      this.log.info("Connection to RabbitMQ server initialized");
+      const queue = options.queueId || "cc-tx-viz-exchange";
+      this.queueId = queue;
+      this.persistMessages = options.persistMessages || false;
+      this.amqpExchange = this.amqpConnection.declareExchange(
+        `cc-tx-viz-exchange`,
+        "direct",
+        { durable: this.persistMessages },
+      );
+      this.amqpQueue = this.amqpConnection.declareQueue(this.queueId, {
+        durable: this.persistMessages,
+      });
+      this.amqpQueue.bind(this.amqpExchange);
+    }
   }
 
   public getOpenApiSpec(): unknown {
@@ -170,6 +211,11 @@ export class PluginLedgerConnectorBesu
 
   public getPrometheusExporter(): PrometheusExporter {
     return this.prometheusExporter;
+  }
+
+  public closeConnection(): Promise<void> {
+    this.log.info("Closing Amqp connection");
+    return this.amqpConnection?.close();
   }
 
   public async getPrometheusExporterMetrics(): Promise<MetricModel[]> {
@@ -345,7 +391,6 @@ export class PluginLedgerConnectorBesu
         const web3SigningCredential = req.signingCredential as
           | Web3SigningCredentialPrivateKeyHex
           | Web3SigningCredentialCactusKeychainRef;
-
         const receipt = await this.transact({
           transactionConfig: {
             data: `0x${contractJSON.bytecode}`,
@@ -361,7 +406,6 @@ export class PluginLedgerConnectorBesu
           web3SigningCredential,
           privateTransactionConfig: req.privateTransactionConfig,
         });
-
         const address = {
           address: receipt.transactionReceipt.contractAddress,
         };
@@ -384,7 +428,6 @@ export class PluginLedgerConnectorBesu
         `${fnTag} Cannot invoke a contract without contract instance, the keychainId param is needed`,
       );
     }
-
     contractInstance = this.contracts[contractName];
     if (req.contractAbi != undefined) {
       let abi;
@@ -484,6 +527,34 @@ export class PluginLedgerConnectorBesu
       const out = await this.transact(txReq);
       const success = out.transactionReceipt.status;
       const data = { success, out };
+      //TODO
+      if (this.collectTransactionReceipts) {
+        const extendedReceipt: BesuV2TxReceipt = {
+          caseID: "BESU_TBD",
+          blockchainID: LedgerType.Besu2X,
+          invocationType: req.invocationType,
+          methodName: req.methodName,
+          parameters: req.params,
+          timestamp: new Date(),
+          contractName: req.contractName,
+          status: out.transactionReceipt.status,
+          transactionHash: out.transactionReceipt.transactionHash,
+          transactionIndex: out.transactionReceipt.transactionIndex,
+          blockNumber: out.transactionReceipt.blockNumber,
+          blockHash: out.transactionReceipt.blockHash,
+          gasPrice: req.gasPrice,
+          gas: req.gas,
+          from: out.transactionReceipt.from,
+          to: out.transactionReceipt.to,
+          value: req.value,
+          gasUsed: out.transactionReceipt.gasUsed,
+          keychainID: req.keychainId,
+          signingCredentials: req.signingCredential,
+        };
+        const txReceipt = new amqp.Message(extendedReceipt);
+        this.amqpQueue?.send(txReceipt);
+        this.log.debug(`Sent transaction receipt to queue ${this.queueId}`);
+      }
       return data;
     } else {
       throw new Error(

@@ -827,6 +827,10 @@
                 ],
                 "additionalProperties": false,
                 "properties": {
+                    "caseID": {
+                        "type": "string",
+                        "nullable": false
+                    },
                     "contractName": {
                         "type": "string",
                         "nullable": false
