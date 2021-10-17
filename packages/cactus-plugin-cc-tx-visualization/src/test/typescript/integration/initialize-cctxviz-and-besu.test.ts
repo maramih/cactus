@@ -39,11 +39,10 @@ import {
 import Web3 from "web3";
 import HelloWorldContractJson from "@hyperledger/cactus-plugin-ledger-connector-besu/src/test/solidity/hello-world-contract/HelloWorld.json";
 
-const testCase = "Instantiate plugin";
+const testCase = "Instantiate plugin with BESU";
 const logLevel: LogLevelDesc = "TRACE";
 const queueName = "cc-tx-viz-exchange";
-//const firstMessage = "[1] Hello Nexus-6";
-//const anotherMessage = "[2] Would you please take the VK test?";
+
 test("BEFORE " + testCase, async (t: Test) => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
   await t.doesNotReject(pruning, "Pruning didn't throw OK");
@@ -67,7 +66,7 @@ test(testCase, async (t: Test) => {
     persistMessages: false,
   };
 
-  //BESU
+  //initialize BESU
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
 
@@ -150,10 +149,6 @@ test(testCase, async (t: Test) => {
 
   await besuConnector.getOrCreateWebServices();
   await besuConnector.registerWebServices(expressAppBesu, wsApi);
-
-  // apis' config
-  // const testApiConfig: APIConfig[] = [];
-  // testApiConfig.push({type: LedgerType.Besu2X, basePath:apiHostBesu});
 
   //add connector reference to the registry
   const testConnectorRegistry = new PluginRegistry();

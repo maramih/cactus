@@ -2,7 +2,11 @@
 
 // import { PluginRegistry } from "@hyperledger/cactus-core";
 // import { Server as SocketIoServer } from "socket.io";
-// import { Constants, LedgerType, PluginImportType } from "@hyperledger/cactus-core-api";
+// import {
+//   Constants,
+//   LedgerType,
+//   PluginImportType,
+// } from "@hyperledger/cactus-core-api";
 // import test, { Test } from "tape-promise/tape";
 // import { v4 as uuidv4 } from "uuid";
 // import {
@@ -101,15 +105,15 @@
 // // });
 
 // const logLevel: LogLevelDesc = "TRACE";
-// test("BEFORE " , async (t: Test) => {
+// test("BEFORE ", async (t: Test) => {
 //   const pruning = pruneDockerAllIfGithubAction({ logLevel });
 //   await t.doesNotReject(pruning, "Pruning didn't throw OK");
 //   t.end();
 // });
 
 // test("Connector Instantiaton with Fabric and Besu", async (t: Test) => {
-// //FABRIC
-// const logLevel: LogLevelDesc = "TRACE";
+//   //FABRIC
+//   const logLevel: LogLevelDesc = "TRACE";
 
 //   test.onFailure(async () => {
 //     await Containers.logDiagnostics({ logLevel });
@@ -161,7 +165,9 @@
 //     ]),
 //   });
 
-//   const FabricPluginRegistry = new PluginRegistry({ plugins: [keychainPluginFabric] });
+//   const FabricPluginRegistry = new PluginRegistry({
+//     plugins: [keychainPluginFabric],
+//   });
 
 //   const discoveryOptions: DiscoveryOptions = {
 //     enabled: true,
@@ -192,7 +198,9 @@
 //     port: 0,
 //     server: serverFabric,
 //   };
-//   const addressInfoFabric = (await Servers.listen(listenOptionsFabric)) as AddressInfo;
+//   const addressInfoFabric = (await Servers.listen(
+//     listenOptionsFabric,
+//   )) as AddressInfo;
 //   test.onFinish(async () => await Servers.shutdown(serverFabric));
 //   const { address, port } = addressInfoFabric;
 //   const apiHostFabric = `http://${address}:${port}`;
@@ -212,118 +220,121 @@
 //     keychainRef: keychainEntryKeyFabric,
 //   };
 
-// //BESU
-// const besuTestLedger = new BesuTestLedger();
-// await besuTestLedger.start();
+//   //BESU
+//   const besuTestLedger = new BesuTestLedger();
+//   await besuTestLedger.start();
 
-// test.onFinish(async () => {
-//   await besuTestLedger.stop();
-//   await besuTestLedger.destroy();
-//   await pruneDockerAllIfGithubAction({ logLevel });
-// });
+//   test.onFinish(async () => {
+//     await besuTestLedger.stop();
+//     await besuTestLedger.destroy();
+//     await pruneDockerAllIfGithubAction({ logLevel });
+//   });
 
-// const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
-// const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
+//   const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
+//   const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
 
-// const firstHighNetWorthAccount = besuTestLedger.getGenesisAccountPubKey();
-// const besuKeyPair = {
-//   privateKey: besuTestLedger.getGenesisAccountPrivKey(),
-// };
+//   const firstHighNetWorthAccount = besuTestLedger.getGenesisAccountPubKey();
+//   const besuKeyPair = {
+//     privateKey: besuTestLedger.getGenesisAccountPrivKey(),
+//   };
 
-// const web3 = new Web3(rpcApiHttpHost);
-// const testEthAccount = web3.eth.accounts.create(uuidv4());
+//   const web3 = new Web3(rpcApiHttpHost);
+//   const testEthAccount = web3.eth.accounts.create(uuidv4());
 
-// const keychainEntryKeyBesu = uuidv4();
-// const keychainEntryValueBesu = testEthAccount.privateKey;
-// const keychainPluginBesu = new PluginKeychainMemory({
-//   instanceId: uuidv4(),
-//   keychainId: uuidv4(),
-//   // pre-provision keychain with mock backend holding the private key of the
-//   // test account that we'll reference while sending requests with the
-//   // signing credential pointing to this keychain entry.
-//   backend: new Map([[keychainEntryKeyBesu, keychainEntryValueBesu]]),
-//   logLevel,
-// });
-// keychainPluginBesu.set(
-//   HelloWorldContractJson.contractName,
-//   JSON.stringify(HelloWorldContractJson),
-// );
-// const factory = new PluginFactoryLedgerConnector({
-//   pluginImportType: PluginImportType.Local,
-// });
+//   const keychainEntryKeyBesu = uuidv4();
+//   const keychainEntryValueBesu = testEthAccount.privateKey;
+//   const keychainPluginBesu = new PluginKeychainMemory({
+//     instanceId: uuidv4(),
+//     keychainId: uuidv4(),
+//     // pre-provision keychain with mock backend holding the private key of the
+//     // test account that we'll reference while sending requests with the
+//     // signing credential pointing to this keychain entry.
+//     backend: new Map([[keychainEntryKeyBesu, keychainEntryValueBesu]]),
+//     logLevel,
+//   });
+//   keychainPluginBesu.set(
+//     HelloWorldContractJson.contractName,
+//     JSON.stringify(HelloWorldContractJson),
+//   );
+//   const factory = new PluginFactoryLedgerConnector({
+//     pluginImportType: PluginImportType.Local,
+//   });
 
-// const BesuConnector: PluginLedgerConnectorBesu = await factory.create({
-//   rpcApiHttpHost,
-//   rpcApiWsHost,
-//   logLevel,
-//   instanceId: uuidv4(),
-//   pluginRegistry: new PluginRegistry({ plugins: [keychainPluginBesu] }),
-// });
+//   const BesuConnector: PluginLedgerConnectorBesu = await factory.create({
+//     rpcApiHttpHost,
+//     rpcApiWsHost,
+//     logLevel,
+//     instanceId: uuidv4(),
+//     pluginRegistry: new PluginRegistry({ plugins: [keychainPluginBesu] }),
+//   });
 
-// const expressAppBesu = express();
-// expressAppBesu.use(bodyParser.json({ limit: "250mb" }));
-// const serverBesu = http.createServer(expressAppBesu);
+//   const expressAppBesu = express();
+//   expressAppBesu.use(bodyParser.json({ limit: "250mb" }));
+//   const serverBesu = http.createServer(expressAppBesu);
 
-// const wsApi = new SocketIoServer(serverBesu, {
-//   path: Constants.SocketIoConnectionPathV1,
-// });
+//   const wsApi = new SocketIoServer(serverBesu, {
+//     path: Constants.SocketIoConnectionPathV1,
+//   });
 
-// const listenOptionsBesu: IListenOptions = {
-//   hostname: "localhost",
-//   port: 0,
-//   server: serverBesu,
-// };
-// const addressInfoBesu = (await Servers.listen(listenOptionsBesu)) as AddressInfo;
-// test.onFinish(async () => await Servers.shutdown(serverBesu));
-// const addressBesu:string = addressInfoBesu.address;
-// const portBesu:number = addressInfoBesu.port;
-// const apiHostBesu = `http://${addressBesu}:${portBesu}`;
-// t.comment(
-//   `Metrics URL: ${apiHostBesu}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-besu/get-prometheus-exporter-metrics`,
-// );
+//   const listenOptionsBesu: IListenOptions = {
+//     hostname: "localhost",
+//     port: 0,
+//     server: serverBesu,
+//   };
+//   const addressInfoBesu = (await Servers.listen(
+//     listenOptionsBesu,
+//   )) as AddressInfo;
+//   test.onFinish(async () => await Servers.shutdown(serverBesu));
+//   const addressBesu: string = addressInfoBesu.address;
+//   const portBesu: number = addressInfoBesu.port;
+//   const apiHostBesu = `http://${addressBesu}:${portBesu}`;
+//   t.comment(
+//     `Metrics URL: ${apiHostBesu}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-besu/get-prometheus-exporter-metrics`,
+//   );
 
-// const wsBasePath = apiHostFabric + Constants.SocketIoConnectionPathV1;
-// t.comment("WS base path: " + wsBasePath);
-// const besuApiClientOptions = new BesuApiClientOptions({ basePath: apiHostBesu });
-// await BesuConnector.getOrCreateWebServices();
-// await BesuConnector.registerWebServices(expressAppBesu, wsApi);
+//   const wsBasePath = apiHostFabric + Constants.SocketIoConnectionPathV1;
+//   t.comment("WS base path: " + wsBasePath);
+//   const besuApiClientOptions = new BesuApiClientOptions({
+//     basePath: apiHostBesu,
+//   });
+//   await BesuConnector.getOrCreateWebServices();
+//   await BesuConnector.registerWebServices(expressAppBesu, wsApi);
 
-// // // apis' config
-// const testApiConfig: APIConfig[] = [];
-// testApiConfig.push({type: LedgerType.Fabric2, basePath:apiHostFabric});
-// testApiConfig.push({type: LedgerType.Besu2X, basePath:apiHostBesu});
+//   // // apis' config
+//   const testApiConfig: APIConfig[] = [];
+//   testApiConfig.push({ type: LedgerType.Fabric2, basePath: apiHostFabric });
+//   testApiConfig.push({ type: LedgerType.Besu2X, basePath: apiHostBesu });
 
-// //add connector reference to the registry
-// const connectorRegistryTest = new PluginRegistry();
-// connectorRegistryTest.add(FabricConnector);
-// connectorRegistryTest.add(BesuConnector);
+//   //add connector reference to the registry
+//   const connectorRegistryTest = new PluginRegistry();
+//   connectorRegistryTest.add(FabricConnector);
+//   connectorRegistryTest.add(BesuConnector);
 
-// //apiClients
-// const besuApiClient = new BesuApiClient(besuApiClientOptions);
-// const fabricApiClient = new DefaultApi(FabricApiConfig);
+//   //apiClients
+//   const besuApiClient = new BesuApiClient(besuApiClientOptions);
+//   const fabricApiClient = new DefaultApi(FabricApiConfig);
 
-//  //add apiClients
-//  const apiClientsTest: any[] = [];
-//  apiClientsTest.push(fabricApiClient);
-//  apiClientsTest.push(besuApiClient);
+//   //add apiClients
+//   const apiClientsTest: any[] = [];
+//   apiClientsTest.push(fabricApiClient);
+//   apiClientsTest.push(besuApiClient);
 
-//  // TODO instantiate cctxviz
+//   // TODO instantiate cctxviz
 
-// {
-//   const res = await fabricApiClient.runTransactionV1({
-//     signingCredential,
-//     channelName,
-//     contractName,
-//     invocationType: FabricContractInvocationType.Call,
-//     methodName: "GetAllAssets",
-//     params: [],
-//   } as RunTransactionRequest);
-//   t.ok(res);
-//   t.ok(res.data);
-//   t.equal(res.status, 200);
-//   t.doesNotThrow(() => JSON.parse(res.data.functionOutput));
-// }
+//   {
+//     const res = await fabricApiClient.runTransactionV1({
+//       signingCredential,
+//       channelName,
+//       contractName,
+//       invocationType: FabricContractInvocationType.Call,
+//       methodName: "GetAllAssets",
+//       params: [],
+//     } as RunTransactionRequest);
+//     t.ok(res);
+//     t.ok(res.data);
+//     t.equal(res.status, 200);
+//     t.doesNotThrow(() => JSON.parse(res.data.functionOutput));
+//   }
 
-// t.end();
-
+//   t.end();
 // });

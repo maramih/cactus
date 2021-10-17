@@ -1,5 +1,11 @@
 import { LedgerType } from "@hyperledger/cactus-core-api";
 import { Web3SigningCredential } from "@hyperledger/cactus-plugin-ledger-connector-besu/src/main/typescript/public-api";
+import {
+  FabricSigningCredential,
+  GatewayOptions,
+  TransactReceiptBlockMetaData,
+  TransactReceiptTransactionCreator,
+} from "@hyperledger/cactus-plugin-ledger-connector-fabric/src/main/typescript/generated/openapi/typescript-axios/api";
 
 export interface TransactionReceipt {
   caseID: string;
@@ -18,7 +24,19 @@ export interface IsVisualizable {
 
 // TODO define Tx Receipt for Fabric
 export interface FabricV2TxReceipt extends TransactionReceipt {
-  channel: string;
+  channelName: string;
+  contractName: string;
+  endorsingPeers?: string[];
+  endorsingParties?: string[];
+  transientData?: any | null;
+  gatewayOptions?: GatewayOptions;
+  signingCredentials: FabricSigningCredential;
+  blockNumber?: string;
+  transactionCreator?: TransactReceiptTransactionCreator;
+  blockMetaData?: TransactReceiptBlockMetaData;
+  chainCodeName?: string;
+  chainCodeVersion?: string;
+  responseStatus?: string;
 }
 export interface BesuV2TxReceipt extends TransactionReceipt {
   status: boolean;

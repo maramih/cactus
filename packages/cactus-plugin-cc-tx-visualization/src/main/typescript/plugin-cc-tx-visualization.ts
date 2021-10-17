@@ -33,7 +33,7 @@ export interface IWebAppOptions {
 }
 import * as Amqp from "amqp-ts";
 import { CrossChainModel } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/crosschain-model";
-import { BesuV2TxReceipt } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/transaction-receipt";
+import { BesuV2TxReceipt, FabricV2TxReceipt } from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/transaction-receipt";
 
 export interface IChannelOptions {
   queueId: string,
@@ -261,9 +261,21 @@ export class CcTxVisualization
             this.log.info("Added Cross Chain event from BESU");
             break;
           case LedgerType.Fabric2:
-            this.log.info("Tx Receipt is not supported yet");
+            const fabricReceipt: FabricV2TxReceipt = receipt;
+            const ccEventFromFabric:CrossChainEvent = {
+              caseID: fabricReceipt.caseID,
+              blockchainID: fabricReceipt.blockchainID,
+              invocationType: fabricReceipt.invocationType,
+              methodName: fabricReceipt.methodName,
+              parameters: fabricReceipt.parameters,
+              timestamp: fabricReceipt.timestamp,
+            };
+            this.crossChainLogs.addCrossChainEvent(ccEventFromFabric);
+            this.log.info("Added Cross Chain event from FABRIC");
+            break;
           default:
             this.log.info("Tx Receipt is not supported");
+            break;
         }
         
       });

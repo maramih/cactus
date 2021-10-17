@@ -32,6 +32,7 @@ import {
   IWebServiceEndpoint,
   ICactusPlugin,
   ICactusPluginOptions,
+  LedgerType,
 } from "@hyperledger/cactus-core-api";
 
 import {
@@ -110,7 +111,7 @@ import {
 } from "./common/get-transaction-receipt-by-tx-id";
 import {performance} from "perf_hooks";
 import * as amqp from "amqp-ts";
-import {IsVisualizable} from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/transaction-receipt";
+import {FabricV2TxReceipt, IsVisualizable} from "@hyperledger/cactus-plugin-cc-tx-visualization/src/main/typescript/models/transaction-receipt";
 //import {IsVisualizable} from "@hyperledger/cactus-plugin-cc-tx-visualization";
 //import { randomUUID } from "crypto";
 
@@ -172,11 +173,7 @@ export class PluginLedgerConnectorFabric
   private readonly secureIdentity: SecureIdentityProviders;
   private readonly certStore: CertDatastore;
   public transactionReceipts: any[]=[];
-  //TODO: add array of tx, define a tx model: method values timestamp
-  //check the req type
-  //private transactions: Array<>();
-
-
+ 
   private amqpConnection: amqp.Connection | undefined;
   private amqpQueue: amqp.Queue | undefined;
   private amqpExchange: amqp.Exchange | undefined;
@@ -274,31 +271,6 @@ export class PluginLedgerConnectorFabric
 
    // this.log.debug(`getPrometheusExporterMetrics() response: %o`, results.values.toString());
     return results;
-  }
-
-  //TODO merging with Jason's code to get each transaction receipt
-  //
-
-  // public async getTransactionReceiptByTxID(
-  //   req: RunTransactionRequest,
-  // ): Promise<GetTransactionReceiptResponse> {
-  //   const gateway = await this.createGateway(req);
-  //   const options: IGetTransactionReceiptByTxIDOptions = {
-  //     channelName: req.channelName,
-  //     params: req.params,
-  //     gateway: gateway,
-  //   };
-  //   return await getTransactionReceiptForLockContractByTxID(options);
-  // }
-
-
-  public async getTransactionReceiptByTxID(): Promise<void> {
-    //returns GetTransactionReceiptResponse
-  }
-
-  //TODO returns Promise<FabricTransactionReceipt>
-  public async getTransactionReceiptsList(): Promise<void>  {
-    //returns list
   }
 
   public getInstanceId(): string {
@@ -1124,6 +1096,7 @@ export class PluginLedgerConnectorFabric
           }
 
           out = await transactionProposal.setTransient(transientMap).submit();
+          transactionId = transactionProposal.getTransactionId();
           success = true;
           break;
         }
@@ -1137,11 +1110,36 @@ export class PluginLedgerConnectorFabric
       const txTimer = endTx - startTx;
       this.prometheusExporter.addTimerOfCurrentTransaction(txTimer);
 
-      if (this.collectTransactionReceipts)  {
-        //TODO get receipt
-        //TODO what does the receipt have? Map to fabric v2 receipt model in the CC-Viz plugin
-        //TODO equiv for Besu
-        const txReceipt = new amqp.Message("receipt");
+      if (this.collectTransactionReceipts && transactionId !== "")  {
+        const txParams = req.params;
+        //getTransactionReceiptByTxID requires 2 params in req.params => channelName and txID
+        req.params = [];
+        req.params[0] = req.channelName;
+        req.params[1] = transactionId;
+        //req.params get are stored in the basicTxReceipt rwsetWriteData
+        const basicTxReceipt = await this.getTransactionReceiptByTxID(req);
+        const extendedReceipt: FabricV2TxReceipt={
+          caseID:req.caseID || "FABRIC_TBD",
+          blockchainID: LedgerType.Fabric2,
+          invocationType: req.invocationType,
+          methodName: req.methodName,
+          parameters: txParams,
+          timestamp: new Date(),
+          channelName: req.channelName ,
+          contractName: req.contractName,
+          signingCredentials: req.signingCredential,
+          endorsingParties: req.endorsingParties,
+          endorsingPeers: req.endorsingPeers,
+          gatewayOptions: req.gatewayOptions,
+          transactionCreator: basicTxReceipt.transactionCreator,
+          transientData: req.transientData,
+          blockMetaData: basicTxReceipt.blockMetaData,
+          chainCodeName: basicTxReceipt.chainCodeName,
+          blockNumber: basicTxReceipt.blockNumber,
+          chainCodeVersion:basicTxReceipt.chainCodeVersion,
+          responseStatus:basicTxReceipt.responseStatus,
+        };
+        const txReceipt = new amqp.Message(extendedReceipt);
         this.amqpQueue?.send(txReceipt);
         this.log.debug(`Sent transaction receipt to queue ${this.queueId}`);
       }
